@@ -1,0 +1,1284 @@
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+NEUROSCIENCE                                                                                                                            Copyright © 2022
+                                                                                                                                        The Authors, some
+A data-based large-scale model for primary visual                                                                                       rights reserved;
+                                                                                                                                        exclusive licensee
+cortex enables brain-like robust and versatile                                                                                          American Association
+                                                                                                                                        for the Advancement
+visual processing                                                                                                                       of Science. No claim to
+                                                                                                                                        original U.S. Government
+                                                                                                                                        Works. Distributed
+Guozhang Chen, Franz Scherr, Wolfgang Maass*                                                                                            under a Creative
+                                                                                                                                        Commons Attribution
+We analyze visual processing capabilities of a large-scale model for area V1 that arguably provides the most com-                       License 4.0 (CC BY).
+prehensive accumulation of anatomical and neurophysiological data to date. We find that this brain-like neural
+network model can reproduce a number of characteristic visual processing capabilities of the brain, in particular
+the capability to solve diverse visual processing tasks, also on temporally dispersed visual information, with
+remarkable robustness to noise. This V1 model, whose architecture and neurons markedly differ from those of
+deep neural networks used in current artificial intelligence (AI), such as convolutional neural networks (CNNs),
+also reproduces a number of characteristic neural coding properties of the brain, which provides explanations for
+its superior noise robustness. Because visual processing is substantially more energy efficient in the brain compared
+with CNNs in AI, such brain-like neural networks are likely to have an impact on future technology: as blueprints
+for visual processing in more energy-efficient neuromorphic hardware.
+
+
+
+
+                                                                                                                                                                   Downloaded from https://www.science.org on November 08, 2025
+INTRODUCTION                                                                      not have enough data about these plasticity processes to reproduce
+The comprehensive model (1) for a patch of cortical area V1 in                    them in a model. However, we can address the question of what
+mouse provides an unprecedented window into the dynamics of this                  visual processing capabilities are supported by the model if synaptic
+brain area. We show that it also provides a unique tool for studying              weights are aligned for visual processing tasks through stochastic
+brain-style visual processing and neural coding.                                  gradient descent. We applied this strategy to five different visual
+   The architecture of V1 exhibits an interesting combination of                  processing tasks that have commonly been considered in biological
+feedforward and recurrent connectivity: Neurons are distributed over              experiments (3–8). Afterward, our model achieved high accuracy
+several parallel two-dimensional (2D) sheets (Fig. 1A), commonly                  simultaneously for all five tasks while working in a biologically real-
+referred to in neuroscience as layers or laminae. The neurons are                 istic sparse firing regime close to criticality (9, 10). Unexpectedly, its
+recurrently connected, but not randomly or in an all-to-all manner.               performance level remained in the same high-performance regime
+Rather, synaptic connections exist primarily between nearby neurons,              as the brain, even when we subjected the V1 model to noise in the
+both within a layer and between layers. Connectivity between layers               images and in the network that it had not encountered during training.
+supports a strong feedforward stream of visual information from L4                We demonstrate that this out-of-distribution (OOD) generalization
+to L2/3 to L5/6, which is complemented by a host of recurrent loops.              capability of the V1 model with regard to new perturbations is far
+The dominance of short connections makes it possible to combine                   superior to that of convolutional neural networks (CNNs). We pro-
+in V1 extensive recurrent connectivity with a really small total wire             vide an explanation for that through an analysis of neural coding
+length, which is essential for its physical realization.                          properties of these two types of models: Both use high-dimensional
+   The model of (1) also integrates, besides these anatomical details,            neural codes for images. However, the neural representation in the
+a host of neurophysiological data about area V1. The point neuron                 model of (1) is more robust because it uses, like the brain (11), a
+version of this model that we are considering uses generalized leaky              power law for the explained variance in higher principal components
+integrate-and-fire (LIF) neurons, more precisely GLIF3 neurons.                   analysis (PCA) components that is close to a theoretically optimal
+These have, in addition to the membrane potential, two further hidden             compromise between the goal to be sensitive to details of visual
+variables that model slower processes in biological neurons. The large            inputs and the goal to be robust to noise from the visual input and
+diversity of neurons in the brain is reflected in the model of (1) through        within the network. In contrast, neural codes in CNNs were shown
+the use of 111 different types of GLIF3 neuron models that have                   to have a different power law (12) that favors the first (coding pre-
+each been fitted to experimental data in the Allen Brain Atlas (2).               cision) over the second goal (noise robustness). In addition, we
+   The original model of (1) is not able to solve nontrivial computing            demonstrate that the model of (1) preferentially uses those dimen-
+tasks, because its synaptic weights were chosen on the basis of sparse            sions of population activity for coding that are orthogonal to the
+experimental data about the mean and variance of synaptic weights.                largest noise dimensions, like the brain does (3).
+In contrast, synaptic weights in the living brain are individually                    Together, our results show that the currently available anatomical
+tuned through a host of synaptic plasticity processes, and these pro-             and neurophysiological data, as compiled in (1), provide the basis
+cesses induce higher-order correlations between weights that are                  for a new generation of neural network models for visual processing
+crucial for computing capabilities of the network. At present, we do              that can solve diverse visual processing capabilities in a highly
+                                                                                  robust manner. Furthermore, these neural network models provide
+                                                                                  new paradigms for neuromorphic computing because they combine
+Institute of Theoretical Computer Science, Graz University of Technology, Graz,
+Austria.                                                                          versatility and robustness to noise with small total wire length and
+*Corresponding author. Email: maass@igi.tugraz.at                                 highly energy-efficient sparse activity.
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                             1 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+                                A
+
+
+
+
+                                B
+
+
+
+
+                            C                                                                     D
+
+
+
+
+                                                                                                                                                                               Downloaded from https://www.science.org on November 08, 2025
+                            E                                                            F
+
+
+
+
+Fig. 1. V1 model of (1). (A) The model consists of four classes of neurons on five layers. It comes together with a model for LGN, which transforms visual inputs into input
+currents to neurons in the V1 model. The LGN model receives visual input from an oval in the central part of an image (1). (B) The model contains one excitatory and three
+inhibitory neuron classes. Each dot denotes the position of a neuron. (C) The data-based base connection probabilities of (1) depend on the cell class to which the pre-
+synaptic (row labels) and postsynaptic neuron (column labels) belongs. White grid cells denote unknown values. (D) The base connection probability from (C) is multi-
+plied according to (1) for any given pair of neurons by an exponentially decaying factor that depends on the lateral distance between them. Note that the illustrations in
+(A), (C), and (D) were created by us and derived from the publicly available data provided in (1). (E) Spike outputs of two randomly selected neurons from the V1 model
+for 10 trials with the same input (a trial of visual change detection task for natural images), using the noise model of (1). (F) Same as in (E) but for the version of the
+data-driven noise model with s = q = 2 that we used as default-noise model during testing. It causes substantially larger trial-to-trial variability.
+
+
+RESULTS                                                                                V1 in mouse from (1), which is arguably the most comprehensive
+Integration of anatomical and neurophysiological data,                                 integration of anatomical and neurophysiological data on area V1
+as well as data on noise in the brain, into a neural network                           that are currently available.
+model of area V1                                                                          The network model is a spatially structured model for a patch of
+Several decades of intense research efforts have accumulated a large                   V1 that consists of 51,978 neurons from four main classes: one class
+body of knowledge about the anatomy and neurophysiology of the                         of excitatory neurons and three classes of inhibitory neurons
+visual cortex, especially for primary visual cortex, i.e., for area V1.                (Fig. 1B) that are distributed over five horizontal layers of neurons,
+However, it has remained unknown to what extent this insight into                      labeled as L1, L2/3, L4, L5, and L6. Synaptic connections between
+the structure of V1 can be related to its function. We have examined                   these neurons are generated from data-based connection probabilities.
+this question for the case of the large-scale model for a patch of                     These are defined in terms of base connection probabilities (Fig. 1C)
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                                         2 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+that depend on the class and layer of the pre- and postsynaptic neuron.    far beyond that, because visual information arrives in natural envi-
+These base connection probabilities are scaled for each concrete           ronments, especially in the presence of active vision, in a piecemeal
+pair of neurons by an exponentially decaying function of the lateral       manner. Hence, brains need to be able to integrate temporally dis-
+distance between their somata (Fig. 1D). This distance-dependent           persed information, which can, in general, not be carried out by a
+scaling entails that most synaptic connections are between nearby          feedforward neural network. Furthermore, brains can solve many
+neurons and, hence, that the total wire length is small. However, it       different visual processing tasks with the same neural network with-
+also affects the specific style of computational processing in the V1      out changing their synaptic weights. We wondered whether the V1
+model: Information is not continuously spread out all over the net-        model also has this capability. Therefore, we tested it after training
+work as in randomly connected recurrent neural networks, which             not only on a standard image classification task, classification of
+are frequently used as models for neural networks of the brain. To         handwritten digits from the MNIST (modified national institute of
+transform images and movies into input currents to neurons in this         standards and technology) database, but also on four tasks that
+V1 model, we used the preprocessing module [lateral geniculate             require temporal integration of visual information (Fig. 2A). The
+nucleus (LGN) model] of (1) (see Fig. 1A). It consists of 17,400 filters   latter ones have all been used in mouse experiments, and data on
+that model in a qualitative manner the responses of four classes of        their behavioral performance are available. The five selected tasks
+experimentally observed LGN neurons (sustained ON, sustained               are illustrated in Fig. 2: discrimination of subtle differences in the
+OFF, transient ON/OFF, and transient OFF/ON), which are further            orientation of drifting gratings (Fig. 2B), as in the experiments of
+subdivided according to preferred temporal frequencies. We will            (3, 4); a generic image classification task (Fig. 2C); visual change
+refer in the following to this model of V1 in conjunction with the         detection tasks for natural images and static gratings (Fig. 2D), as
+LGN model of (1) as the V1 model.                                          considered in (5, 6); and accumulation of temporally dispersed cues
+    Individual neurons are modeled as point neurons. However, in con-      on the left and right (Fig. 2E), as considered in (7, 8), some of them
+
+
+
+
+                                                                                                                                                      Downloaded from https://www.science.org on November 08, 2025
+trast to the customary LIF neuron models, the V1 model uses 111 dif-       with slightly longer delay periods.
+ferent variations of the LIF model, which are referred to as GLIF3             To test the performance of the V1 model on these tasks, one has
+neuron models because they have, in addition to the membrane po-           to specify a convention for extracting the network decision. One
+tential, two other internal variables that model after-spike currents in   frequently used convention [see, e.g., (15)] is to let an external
+the neuron on slower time scales. These 111 different neuron types         “readout neuron” that receives synaptic input from all neurons
+have been fitted to experimental data for 111 selected neurons from the    in the network produce the network decision (fig. S3A). Obviously,
+neocortex according to the cell database of the Allen Brain Atlas (2).     there are no such readout neurons in the brain that receive synaptic
+    The neurons in the model of (1) also received, besides inputs          inputs from all neurons in a patch of the neocortex. Furthermore,
+from the LGN model and inputs from other neurons, a small noise            this convention is not suitable for probing the computational capa-
+current. This noise was generated by a single Poisson source for all       bility of such a network model. Theoretical results (16, 17) imply
+neurons. Hence, this noise is highly correlated, but its amplitude is      that if the network model is sufficiently large and has diverse units
+so small that it has only little impact on neural firing (Fig. 1E). As     so that it approximately satisfies the point-wise separation property
+such, we focused instead on a data-driven noise model. This noise          for relevant input streams, such global readout neurons become
+model is based on experimental data from area V1 of the awake              computationally quite powerful even if only the weights of these
+mouse (11). More precisely, we used the heavy-tailed distribution of       readouts are trained for a specific task. Hence, global linear readouts
+noise amplitudes that arises from their experimental data (fig. S1).       tend to mask the computational contribution of the neural network
+Furthermore, we superimposed two forms of noise: a quick form noise        model itself. This theoretical prediction turns out to be valid also for
+with scaling factor q, where a new value is drawn every millisecond        the V1 model: If one takes the V1 model as defined in (1), without
+from this distribution, mimicking, for example, noise that arises from     changing any of its synaptic weights or other parameters, and just
+stochastic synaptic release, and a slow form of noise with scaling         trains linear readouts from all of its neurons for the five tasks, one
+factor s, where a new value is drawn from this heavy-tailed distribu-      already gets a very high average accuracy of all five tasks: 86.99%.
+tion once at the beginning of each trial. The latter mimics the well-      Therefore, we used for the V1 model a more brain-like readout con-
+known dependence of neural responses to the state of the network           vention, where projection neurons within the network (18) extract
+at the beginning of a trial [see, e.g., (13)]. We use the default values   and transmit computational results of the network. In particular, a
+s = q = 2 for scaling these two forms of noise. The resulting noise        large fraction of pyramidal cells on L5 projects computational results
+model causes a qualitatively similar trial-to-trial variability of net-    of the network to subcortical areas where behavioral responses are
+work responses in the V1 model as in the brain [compare fig. S2A           triggered. Consequently, we selected for each computational task
+with extended data figure 5 of (11)]. This trial-to-trial variability is   and each possible outcome of a network decision a population of
+shown for two sample neurons from the V1 model in Fig. 1F.                 30 excitatory neurons on L5 (Fig. 2A). If this population produced
+    The resulting Fano factor of spike counts in 10-ms windows has         more spikes during the response window than competing popula-
+then a value of 1.46 in the V1 model, which is close to the measured       tions that voted for other outcomes, then the outcome for which it
+value of 1.39 in mouse V1 (14). To get a clearer picture of the noise      “voted” was viewed as the network decision. The size of this readout
+robustness of the V1 model, we tested its computational performance        population turned out to have no substantial impact (see Materials
+also for substantially larger values of the scaling factors q and s.       and Methods). It also caused no significant difference whether the
+                                                                           neurons of each readout pool were colocated or are randomly dis-
+The V1 model can solve diverse computational tasks                         tributed on L5 (fig. S3). Note that a colocated readout pool can pos-
+on visual input streams                                                    sibly benefit from synergy, whereas a distributed pool can integrate
+Classification of static images is a very popular test for neural net-     information from more and more widely distributed presynaptic
+works. However, brains have visual processing capabilities that go         neurons. Hence, it is not a priori clear which works better. In our
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                 3 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+                            A
+
+
+
+
+                            B                       C                            D                                      E
+
+
+
+
+                                                                                                                                                                                    Downloaded from https://www.science.org on November 08, 2025
+Fig. 2. Illustration of the readout convention and the five visual processing tasks for which the V1 model was trained. (A) The visual stimuli for all five tasks were
+presented to the LGN model. Separate competing pools of pyramidal cells on L5 were chosen as readout neurons for each task. (B to E) Schematic diagrams and timings
+of five visual tasks (Materials and Methods). (B) In the fine orientation discrimination task, the network received a drifting grating with an orientation very close to 45°, and
+neurons in the corresponding readout pool had to fire if the orientation was larger than 45∘. (C) For the image classification task, the network received a handwritten
+sample of a digit from 0 to 9 from MNIST dataset, and the corresponding one of the 10 readout pools for this task had to fire stronger than the others (two samples for
+digits 7 and 6 are shown). (D) For the visual change detection task, a long sequence of images was presented, with gray screens in between. A corresponding readout pool
+had to become active during the response window if the most recent image differed from the preceding one. Both natural images and static gratings were used. (E) In
+the evidence accumulation task, seven cues were presented sequentially, and after a delay, a corresponding readout pool had to indicate through stronger firing whether
+most cues had been presented on the left or the right.
+
+
+test, both versions perform about equally well. One important dif-                        our case for a batch of such inputs for all five tasks. Then, the loss
+ference to the convention of using global readout neurons is that the set                 function is computed for these computations, and gradient descent
+of neurons in the network that provides synaptic inputs to a neuron                       is applied to the network computations to determine in which di-
+within the network is substantially smaller and spatially constrained.                    rection and by how much each synaptic weight should be changed
+    With the values of synaptic weights provided by (1), the V1                           to decrease the loss function. Then, the whole process is iterated.
+model is incapable of performing any of the five tasks with this bio-                     Stochasticity arises in this gradient descent from random selection
+logically more realistic readout convention: The accuracy is close to                     of network inputs and is, in general, useful for avoiding getting
+chance level (=42%). Even if one trains linear readouts from these                        stuck in local minima of the loss function. We applied stochastic
+small populations of neurons on L5 for the five tasks, one achieves                       gradient descent to the V1 model through a variation of back-
+in the case of the untrained V1 model an accuracy of just 53.74%.                         propagation through time (BPTT), with the help of a suitable
+We therefore applied stochastic gradient descent, like in (19), to the                    pseudo-derivative for handling the discontinuous dynamics of
+synaptic weights of synapses within the V1 model of (1) and to con-                       spiking neurons, as suggested by (20). To avoid artifacts arising from
+nections from the LGN model to the V1 model. No synaptic con-                             an application of gradient descent to the hard reset of GLIF3 neurons
+nections were added or deleted during this process. We also made                          after a spike, we subtracted instead a fixed value from the membrane
+sure that the signs of synaptic weights could not change, i.e., we                        potential after each spike. Control experiments show that this mod-
+maintained the validity of Dale’s law. We used a loss function for                        ification of the neuron model causes no significant difference in the
+gradient descent that penalized inaccurate decisions by the chosen                        spike output of a neuron (fig. S4). The pseudo-derivative is just an
+populations of readout neurons (see Materials and Methods). The                           approximation to ideal stochastic gradient descent, especially when
+loss function also penalized biologically unrealistic high firing rates.                  gradients have to be propagated backward through several spikes.
+    The principle of stochastic gradient descent is to let the network                    However, it appears to be the most powerful tool for training net-
+compute on a given input for one of the computational tasks, or in                        works of spiking neurons that is currently available. It turns out to
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                                              4 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+work especially well for the GLIF3 neuron models of (1), especially                  more detailed analyses in terms of the neuron types involved). The
+in a biologically realistic sparse firing regime, because gradients                  distribution of neural firing activity was, after training, still close to
+can be propagated with high precision through the slowly changing                    the measured distribution in the brain (see Fig. 3B) with an average
+continuous variables of GLIF3 neuron models.                                         firing rate of 4 Hz. Furthermore, training preserves spatial cluster-
+    We found that the type of noise that is applied during training                  ing of orientation tuning in L2/3 (fig. S12), a neural coding feature
+has little influence on the accuracy that is reached during testing:                 that had been demonstrated experimentally for mouse V1 in (21).
+Virtually the same accuracy is achieved when during training the                         Experimental data suggest that neural networks of the brain typ-
+noise model from (1), our data-driven noise model, or no noise at                    ically operate in a critical regime (10, 22, 23). We evaluated the crit-
+all is applied while testing the data-driven noise model (see fig. S5).              icality of the V1 model by measuring its branching ratio of neural
+We think that this effect is due to the implicit noise that is introduced            activity, as suggested by (10). We found that both the untrained
+through the natural in-class variance of network inputs during                       and the trained V1 models operate in a slightly subcritical regime.
+training, because this variance is likely to dominate from the per-                  Training moved the model somewhat closer to the critical regime,
+spective of network function the impact of any milder form of noise                  reaching values of the branching ratio that almost perfectly matched
+within the network. We always report accuracy on test data for the                   recorded data from the brain (Fig. 3C). Hence, the V1 model oper-
+case of data-driven noise within the network. Training was carried                   ated in a dynamic regime that closely matches experimental data.
+out for each network model over five different runs, two with the                        We tested the robustness of the resulting versatile visual process-
+noise model of (1), two with the data-driven noise model (see Fig. 1F),              ing capability of the V1 model after training by exposing its neurons
+and one run without any noise applied during training. Our moti-                     to substantially larger amplitudes q and s of the data-driven noise
+vation for also considering the noise model of (1) was to maintain                   model (see Fig. 3D as an example), although it had never been
+comparability with their original model and for enabling an unbiased                 exposed to such noise during training [where we only applied the
+
+
+
+
+                                                                                                                                                                          Downloaded from https://www.science.org on November 08, 2025
+evaluation of the impact of various types of noise. After training, the              really small noise considered in (1)]. Unexpectedly, it is almost im-
+V1 model achieved on all five tasks a performance that was in the                    possible to destroy its versatile visual processing capability (Fig. 3E):
+same range as reported behavioral data (Table 1), with an average                    It remained stable even when the amplitudes q and s of quick and
+accuracy of 94.28%. Sample computations of the V1 model for each                     slow noise were increased by several orders of amplitude.
+of the five tasks are shown in figs. S6 to S10. The performance after
+training did not depend on our particular choice of readout neurons                  Impact of anatomical and neurophysiological details
+in L5: Choosing randomly distributed instead of colocated pyramidal                  of the V1 model on learning speed and resulting
+cells yielded an average accuracy of 94.67%. As expected, choosing                   computational performance
+instead global linear readout neurons for each task and training                     We show in Fig. 4A the performance of the V1 model and of five
+both the readout weights and the weights in the V1 model led to                      control models on test data, in dependence of the training duration.
+substantially higher accuracy of 98.13%. Hence, we find that the                     In control model 1, we removed the LGN model of (1) and injected
+neural codes in the network could, in principle, support even better                 pixel values directly into the V1 model, targeting the same neurons
+task performance, but biologically realistic readout from V1 reduces                 as the LGN model. This turns out to have just a minor effect on the
+the amount of information that can be used by downstream networks                    properties that we have analyzed. In control model 2, we removed
+for decision-making. This effect suggests an interesting new expla-                  the diversity of the 111 data-based neuron types in the V1 model,
+nation for why behavioral performance of mice lags behind neural                     replacing them with one generic model for excitatory neurons and
+coding fidelity in area V1 (4) (note S1).                                            one for inhibitory neurons. In control model 3, we removed instead
+    The median strength of inhibitory synapses increased from 0.03                   the laminar spatial structure with distance-dependent connection
+to 4.80 pA during training, while the median weights of excitatory                   probabilities of the V1 model, replacing them with an equal number
+synapses decreased from 2.96 to 2.08 pA (see Fig. 3A and fig. S11 for                of randomly chosen connections (without dependence on spatial
+
+
+    Table 1. The V1 model achieves high accuracy in all five tasks, consistent with the behavior performance of mice in similar tasks, after 16 training
+    epochs. The chance level of performance in image classification task is 10%, and those in other tasks are 50%. Note that the behavioral experiments had longer
+    time delays, which made the tasks somewhat more difficult.
+                                              Test accuracy               Behavior accuracy             Mean firing rate (Hz)                Spike raster
+    Fine orientation
+                                                 93.17%                         ∼83%*                            3.97                           Fig. S6
+       discrimination
+    Image classification                         92.11%                           N/A                            4.11                           Fig. S7
+    Visual change detection of                                †                             ‡
+                                             92.13%/92.14%                   ∼73 % /77%                          3.97                           Fig. S8
+       natural images
+    Visual change detection of
+                                                 94.64%                         ∼60%§                            3.90                           Fig. S9
+       gratings
+                                                                                        ǁ
+    Evidence accumulation                        99.32%                         ∼85%                             3.96                           Fig. S10
+
+    *Estimated from figure 4C of (45) when the orientation difference was 90°.   †In the visual change detection task for natural images, the two values refer to
+    testing with familiar and novel images, respectively.   ‡Estimated from figure 1I of (5) when familiar and novel images were presented to
+    mice.   §Estimated from figure 3A of (46) when the orientation difference was 5°.   ǁEstimated from figure 1C of (7) when the number of cues was 6.
+
+
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                                     5 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+
+
+
+                                                                                                                                                                                        Downloaded from https://www.science.org on November 08, 2025
+Fig. 3. Analyses of the V1 model after training. (A) Distributions of excitatory weights (left) and inhibitory weights (right) before and after training. (B) Average distri-
+butions of firing rates for the five tasks before and after training. The distribution is moved through training closer to the one recorded in V1 (6). (C) Criticality of the V1
+model is analyzed and compared with experimental data. The y axis shows estimates of ​​𝝐ˆ​  = 1 − ​m  ˆ ​​, where m
+                                                                                                                  ​​ ˆ ​​is the estimated branching ratio. Estimates of this value in
+the rat brain from (44) are shown on the left. The V1 model produces almost the same branching ratio as the brain, especially after training. Error bars on the left represent
+16 to 84% confidence intervals. Error bars on the right represent SEM over 10 trials. (D) The resulting trial-to-trial variability of neural firing is substantial when s = q = 20;
+see this panel for samples of spiking activity of the same two neurons as in Fig. 1 (E and F) for 10 trials with the same network input (image). (E) Average accuracy of the
+V1 model on test data for the five tasks, as a function of the amplitude q of quick noise and the amplitude s of slow noise. The model had been trained just with the default
+noise of (1), which has much less impact on neural activity according to Fig. 1 (E and F). The arrow in the back points to the accuracy for the default values s = q = 2 for the
+data-driven noise model. One sees that the average accuracy for the five tasks is also robust to much larger noise amplitudes, e.g., for s = q = 20; see arrow in front; it still
+has an average accuracy of 84.53%.
+
+
+proximity). Control model 4 is a randomly connected recurrent                               plateaus from which they can only escape after very long fur-
+network of standard LIF neurons [randomly connected networks of                             ther training.
+spiking neurons (RSNN)] with the same number of neurons and                                     The laminar structure with primarily local synaptic connections
+connections. This is arguably the most commonly considered type                             of the V1 model also affects the dynamics of stochastic gradient
+of spiking neural network model. Control model 5 is a variation of                          descent: Gradients that result from errors at a readout neuron are
+it, where the neurons are split like in the V1 model into excitatory                        not immediately spread out all over the network, which happens in
+and inhibitory neurons, and Dale’s law is preserved during training.                        generic RSNNs, but are rather propagated in a wave-like manner
+This type of model is sometimes seen as an intermediate step from                           over larger and larger parts of the network (Fig. 4, C and D). Conse-
+generic RSNNs toward more biologically oriented network models.                             quently, correlations between learning gradients have, for two neurons
+Two remarkable phenomena are demonstrated in Fig. 4A:                                       in the V1model, a more pronounced dependence on their distance
+(i) The V1 model learns much faster than control models, reaching                           than in a randomly connected control model (Fig. 4B). Hence,
+close to optimal performance after just four training epochs                                the V1 connectivity structure better supports localized computa-
+A closer look at training progress for individual tasks (fig. S13)                          tion and learning within a large network.
+shows that the V1 model makes progress on each task in a continuous                             With regard to the weight initialization before training, we show
+and smooth manner, whereas control models tend to reach early                               in fig. S14 that if one replaces the weight values of the V1 model
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                                                  6 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+                           A                                                                                       B
+
+
+
+
+                           C
+
+
+
+
+                                                                                                                                                                               Downloaded from https://www.science.org on November 08, 2025
+                           D
+
+
+
+
+Fig. 4. Impact of details of the V1 model on learning speed and resulting computational performance. (A) Accuracy on test examples of the V1 model and of
+five control models after varying numbers of training epochs. Whereas neuron diversity and the inclusion of the LGN model have only moderate impact on the learning
+speed and resulting performance, deletion of the laminar structure drastically reduced learning speed and notably reduces the performance level that can be
+reached. RSNN control models have similar deficiencies, with further reduction in achievable performance. Shaded areas represent the SEM over five runs. (B) Resulting
+correlation of total gradient information between neuron pairs in the V1 model and a randomly connected control model 4 (RSNN), collected during a full backpropagation
+pass (600 ms) of the loss function used in the visual change detection task of natural images. Nearby neurons in the V1 model receive correlated gradient information,
+which supports coherent learning in local network modules. (C and D) Spread of gradient information from a single readout neuron in L5 to other neurons depends on
+their distance, shown after 25, 100, and 150 ms of backpropagation from the readout neuron. Whereas these learning signals primarily reach nearby neurons in the V1
+model, they are uniformly spread out all over the network in the RSNN. The loss function is the one used in the image classification task, but applied here only to a single
+readout neuron in the center of L5.
+
+
+
+from (1), which were used as weight initialization in all of the previ-                neurons of the standard RSNN into excitatory and inhibitory neu-
+ously described experiments, with a random initialization that is                      rons (control model 5), which could be seen as an interesting inter-
+commonly used in neural network studies, this drastically reduces                      polation between the most abstract RSNN model and the V1 model,
+performance after the first five training epochs but later provides                    reduces performance in comparison to the generic RSNN.
+the same accuracy.
+(ii) The V1 model reaches higher accuracy than the control                             The power spectrum of neural codes provides
+models, even when each control model is trained much longer                            an explanation for the astounding robustness of visual
+Removal of the laminar structure (control model 3) reduces the                         processing by the V1 model
+accuracy more than the removal of neuron diversity (control model 2).                  An explanation for the robustness of visual processing in area V1
+However, both of these control models still reach higher accuracy                      has been provided by (11). They verified through large-scale record-
+than the standard RSNN (control model 4). Last, partitioning the                       ings from V1 in mouse a theoretically predicted link between noise
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                                         7 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+robustness of visual processing and neural codes for images. They                                        variance continues to increase as further PCA dimensions were in-
+found that V1 uses high-dimensional neural codes for images, but                                         cluded without saturating below the dimensionality (= size) d of the
+the power of higher PCA components decays sufficiently fast so that                                      image ensemble. We applied exactly the same analysis to the trained
+its neural codes remain noise robust. More precisely, they introduced                                    model of (1) and found that the model exhibited the same coding
+a cross-validated PCA that provides unbiased estimates of the                                            property (Fig. 5A). It was also shown in (11) that the explained vari-
+stimulus-related variance. They found that the amount of explained                                       ance of the nth principal component of network representations of
+
+
+                                                      A                                              B                             C
+                                                                                                            Brain (V1)
+
+
+
+
+                                                                                                                                   E
+                                  D
+                                                    4.5
+
+
+
+
+                                                                                                                                                                                  Downloaded from https://www.science.org on November 08, 2025
+                                                                                              L6
+                                                                                              L5
+
+                                                     4
+                           Eigenspectrum exponent
+
+
+
+
+                                                               Untrained                                                           F
+
+                                                                                                              More robust
+                                                                                              L4
+                                                                   Trained                    L2/3
+                                                                                                              neural codes
+                                                                            L4   L2/3    L1
+                                                                                 L5
+                                                                                 L6
+                                                                                                              Higher-
+                                                                                                              dimensional
+                                                                                                              neural codes
+                                                      Brain (V1)             Billeh E
+                                                                                        Billeh I
+
+
+                                  G
+                                                                        0
+                            Excitatory
+                            neurons
+
+
+
+
+                                  H                                    999
+                            Inhibitory
+                            neurons
+
+
+
+
+Fig. 5. Comparing the eigenspectrum of neural codes in the V1 model of (1) with data from the brain and with CNNs. (A) As in the brain, the cumulative fraction of
+explained variance saturates only at the dimension of the input ensemble, here shown for d = 32 and 2800 natural images. (B) Eigenspectra of the untrained/trained V1
+model of (1) with an ensemble of 2800 randomly chosen natural images, and for mouse V1 (11). (C) Exponents of the power law for the V1 model of (1), all for the same
+ensemble of 2800 randomly drawn natural images. (D) Summary result for exponents of the power law for the V1 model of (1) and for CNNs. Billeh E and Billeh I mark
+results where the eigenspectrum is computed for specific populations of excitatory and inhibitory neurons of the model of (1). (E and F) Same as in (C) but for feedforward
+CNNs (FF-CNNs) and recurrent CNNs (RCNNs), respectively. (G) Eigenspectra of excitatory neurons on different layers of the V1 model (1) exhibit values close to the mea-
+sured value from a large sample of neurons in V1. (H) Eigenspectra of inhibitory neurons on different layers.
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)                    2 November 2022                                                                                            8 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+images follows a power-law n−. The exponent  characterizes how                       generally found to have less precise neural codes for sensory stimuli,
+fast the variance that is explained by higher PCA dimensions decays.                   and consistent with that, their eigenspectra decayed substantially
+Their theoretical analysis predicts that  = 1 + 2/d is the optimal                    faster in the V1 model.
+value, because this value provides a theoretically optimal compro-                         We have also reproduced the result of (12) that FF-CNN has a
+mise between encoding too many details (leading to smaller values                      substantially smaller value of  (Fig. 5E) and found that the recurrent
+of ) and keeping the neural code robust to perturbations (leading                     CNN (RCNN) model of (25), which also achieves very high accuracy
+to larger values of ). Other theoretical work (24) also predicts that                 for image classification, has an even smaller value of  (Fig. 5F).
+a value of  close to 1 enhances under mild conditions downstream                      Together, our results imply that the V1 model has, unlike CNNs,
+generalization performance. In vivo recordings of (11) found that                      similar neural coding properties as area V1 in the brain. Further-
+the value of  for primary visual cortex of mouse is close to this                     more, these can be linked, according to the theory of (11), to its
+optimal value  = 1 + 2/d. This neural coding property of area V1 in                   remarkable noise robustness.
+the brain has gained additional interest through the contrasting re-
+sult of (12). They found that feedforward CNNs (FF-CNNs), which                        Comparing noise robustness and OOD generalization
+are viewed to be substantially less noise robust than the brain, have                  of the V1 model and CNNs
+in fact a smaller , as predicted by the theory. Hence, we wondered                    Our preceding analyses of neural coding in the V1 model of (1) and
+whether our more brain-like neural network model for visual pro-                       CNNs suggest that the former is more noise robust. Because it is
+cessing would exhibit a value that is closer to the theoretical optimum.               hard to compare their robustness to noise within the networks with
+We applied for that purpose the same measurement procedure as                          that of CNNs, and because their computational units are so different,
+(11) to the V1 model, for a set of 2800 randomly drawn natural                         we compared instead their robustness to noise in the visual input,
+images. Figure 5B shows the eigenspectrum of PCA component for                         concretely to Gaussian pixel noise that was added to handwritten
+
+
+
+
+                                                                                                                                                                               Downloaded from https://www.science.org on November 08, 2025
+the model of (1) before and after training, and also the measured                      digits from the MNIST dataset. We used Gaussian noise with mean
+eigenspectrum of V1 responses from (11). One sees that the eigen-                      0 and different SD. We first trained each type of neural network on
+spectrum of the model is already, before training, quite close to that                 the original dataset without noise and then tested their classification
+of the brain and is moved by training even closer. The resulting                       performance on images with noise (see Fig. 6A for samples). Figure 6B
+exponent  of the power law (Fig. 5C) is for the model somewhat                        shows that the classification performance of the V1 model is sub-
+higher than in the brain. Figure 5 (D, G, and H) suggests that this                    stantially more robust to the added noise during testing, as predicted
+is largely due to the contributions of inhibitory neurons. They are                    by the preceding analysis of the different neural coding strategies of
+
+                                   A
+
+
+
+
+                                  B 1                                                                                          V1 model
+                                                                                                                               FF-CNN
+                           Test accuracy
+
+
+
+
+                                                                                                                               RCNN
+
+
+                                           0.5
+
+
+
+
+                                            0
+
+                                                                                                                  Train CNNs
+                                  C 1                                                                             with noisy MNIST
+                                                                                                                      FF-CNN SD = 1
+                           Test accuracy
+
+
+
+
+                                                                                                                      FF-CNN SD = 2
+                                                                                                                      FF-CNN SD = 3
+                                           0.5                                                                        FF-CNN SD = 10
+
+
+
+
+                                            0
+                                                 10−2                 10−1            100                     101                      102
+                                                                             Noise amplitude (SD)
+Fig. 6. Robustness of the V1 model and of CNNs to noise in images. (A) Samples of handwritten MNIST digits with Gaussian noise drawn independently from 𝒩(0, SD)
+for each pixel, for different values of the SD. (B) While the V1 model never quite reaches the peak performance of the CNNs, it tolerates noise with fairly high SD, whereas
+the performance of FF-CNNs and RCNNs is substantially degraded even by noise with small SD. (C) Even when CNNs are trained on images with particular noise statistic
+(SD), they do not generalize well to test images with a different value of SD. Furthermore, they do not achieve for SD between 1 and 10 the same noise robustness as the
+V1 model even when they were trained on images with that type of noise.
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)           2 November 2022                                                                                                 9 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+the V1 model and CNNs. To check whether CNNs become more                                  restricting most noise fluctuations in area V1 to dimensions of the
+noise robust when they are, like the V1 model, subjected to internal                      population activity that do not impede neural coding of visual
+noise during training, we applied dropout (26) to them: We randomly                       inputs. We wondered whether the V1 model would inherit this im-
+replaced tensor outputs of ReLu layers with probability p with 0. It                      portant property. Therefore, we carried out the analysis of (3) also for
+turns out that the robustness of CNNs is not improved substantially                       the V1 model, using the same visual stimuli (moving gratings with
+by that (see the results for various values of p in fig. S15).                            orientation differences that were close to the perception threshold).
+    Because neither of these networks had been trained with the                           The discriminability index d′ from (3) is a measure that they pro-
+noisy images for which they were tested, we analyzed here a partic-                       posed as a measure for the fidelity of neural population coding (see
+ular OOD generalization capability of the V1 model and of CNNs.                           the illustration in Fig. 7A). Neural population responses rA(t) and
+Figure 6C demonstrates that even if CNNs are trained with a partic-                       rB(t) to two stimuli A and B form two distributions (ellipses). Partial
+ular noise statistics, they do not perform well if they are tested on                     least square (PLS) analysis projects them onto a subspace where they
+images with a different SD of Gaussian noise. In contrast, the V1                         become most distinct. The discriminability d′ is defined as the sepa-
+model exhibited perfect OOD generalization in this respect. In                            ration, , of the two distributions along the dimension orthogonal to
+addition, the remarkable robustness of the V1 model to noise within                       the optimal boundary (green line) for classifying stimuli in this sub-
+the network (Fig. 3E), even if no noise had not been present during                       space, divided by the SD of each distribution along this dimension.
+training (fig. S5B), can be viewed as an OOD generalization capability.                       The eigenvalues of the noise covariance matrix are plotted in
+                                                                                          Fig. 7B as a function of the number of neurons that are sampled in
+Neural coding dimensions for visual inputs are in the trained                             the V1 model. We found that, also in the V1 model, the projection
+V1 model largely orthogonal to noise, like in the brain                                   of the signal difference  onto the eigenvectors for the largest
+A further explanation for robust coding capabilities of the brain was                     noise eigenvalues is relatively small (Fig. 7C). Furthermore, com-
+
+
+
+
+                                                                                                                                                                                    Downloaded from https://www.science.org on November 08, 2025
+provided by experimental data of (3). They reported that dimen-                           pared with the untrained V1 model, training of this model moved
+sions in which differences between visual stimuli were encoded in                         the signaling dimensions to become more orthogonal to the largest
+area V1 of mouse, i.e., neural coding dimensions, were nearly                             noise dimension (see Fig. 7D). The projection of (d′)2 on an eigen-
+orthogonal to the largest noise modes. This result provided evidence                      vector can be interpreted as the signal-to-noise ratio because it is
+that neural coding in V1 was even robust to noise. In other words,                        the ratio of the projected signal difference and noise eigenvalue
+cortical design principles appear to enhance coding robustness by                         (Materials and Methods).
+
+
+                                                                       B                                          C
+
+
+                             A
+
+
+
+
+                                                                   D                                                  E
+
+
+
+
+Fig. 7. Analyses of relations between signaling and noise dimensions in the V1 model and of the impact of noise correlations when one considers larger numbers
+of neurons. (A) Schematic of the calculation of the discriminability index d′ according to (3). (B) The five largest eigenvalues  ( = 1,2, ⋯,5) of the noise covariance matrix
+in the trained V1 model increase linearly with the number of sampled neurons. (C) Neural coding dimensions () in the trained V1 model were nearly orthogonal to the
+dominant eigenvectors of the noise covariance matrix, e​​​→​​ ​​​, invariant to neuron numbers. (D) Training moved the neural coding dimensions so that they became more
+orthogonal to the dominant noise dimensions. (E) The squared discriminability index (d′)2 kept increasing when applied to more neurons of the V1 model. d′ values were
+normalized by those obtained for trial-shuffled data (averaged across 1 s). Shaded areas in (B), (D), and (E) and error bars in (C) represent the SEM over 100 trials.
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                                            10 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+    It had been argued in (3) that the amount of visual information       and neurophysiological data on area V1 in the mouse brain, provides
+that is encoded in area V1 reaches a ceiling due to noise correlations.   a window not only into brain dynamics but also into visual processing
+This result appeared to contradict the results of (11). A possible ex-    capabilities and neural coding properties that are entailed by these
+planation of this discrepancy was offered in (4): They conjectured        data. In particular, we found that this V1 model exhibits interesting
+that the seemingly limited coding capability of V1 could be ex-           advantages with regard to learning speed and visual processing per-
+plained by the relatively small number of up to 1300 neurons from         formance over models that are closer to common artificial neural
+which simultaneous recordings had been carried out in (3). They           network models, such as RSNNs and CNNs. Furthermore, we have
+suggested that the apparent “ceiling” would rise if one records from      isolated concrete anatomical and neurophysiological features of the
+more neurons. We tested this hypothesis in the V1 model of (1) and        V1 that are responsible for that.
+found that the corresponding measurement d′ for the total amount              CNNs are currently most commonly used for visual processing
+of encoded information keeps increasing, although at a somewhat           in artificial intelligence (AI). They were also inspired by some aspects
+slower rate, when the number of neurons from which one records            of visual processing in the brain, especially the existence of simple
+in the model rises from 1300 to 51,978 (see Fig. 7E).                     and complex cells in area V1. However, a closer look shows that
+                                                                          they differ from V1 in the brain in almost all other respects: with
+Concrete anatomical and neurophysiological features                       regard to their computational units (artificial neurons in CNNs versus
+of the V1 model that are responsible for its superior                     spiking neurons in the brain), the diversity of their units (very few
+noise robustness                                                          simple units versus a large diversity of neurons with different tem-
+We had shown in Fig. 3E that the V1 model is robust to rather high        poral dynamics), their large-scale architecture (usually feedforward,
+levels of internal noise. Figure 8A demonstrates that the laminar         versus recurrent with laminar structure), their small-scale architec-
+spatial organization of the V1 model and its diversity of neuron          ture (very simple network motifs versus a complex combination of
+
+
+
+
+                                                                                                                                                     Downloaded from https://www.science.org on November 08, 2025
+types are both important factors for that. This is corroborated by        feedforward and recurrent processing in cortical microcircuits), and
+the analysis of the discriminability index d' for control models, where   total wire length (almost quadratic versus just linear growth with
+also the projection of neural codes onto the noise dimensions with        the number of processing neurons). V1 in the brain, however, also
+the largest eigenvectors assumes substantially larger values for          differs from CNNs with regard to two important visual processing
+the corresponding control models 2 and 3 than for the V1 model            capabilities: The brain is more versatile because it can solve a number
+(Fig. 8B). Figure 8C shows that the laminar spatial organization and      of diverse visual tasks with the same synaptic weights, in particular
+diversity of neuron types of the V1 model are also both major factors     also tasks that require integration of sequentially arriving visual in-
+for the robustness of the V1 model to external noise in visual inputs     formation. In addition, visual processing in the brain is very noise
+(compare with Fig. 6). Furthermore, in comparison with CNNs,              robust, also to new types of noise (OOD generalization). We have
+neurons in the V1 model are affected much less by this external           shown here that the previously listed fundamental differences be-
+noise (see Fig. 8D). We hypothesize that a major factor for that is       tween the structure of V1 in the brain and CNNs are causally related
+the substantially larger in-degree of neurons in the connectivity         to these two superior visual processing capabilities of the brain: The
+graph of the V1 model (on average, 278) compared with a CNN (9),          V1 model of (1), which integrates a large body of experimental data
+which enables them to integrate over a much larger number of              on area V1 in the brain, is able to perform similarly versatile and
+image pixels, thereby making their output less dependent on noise         robust visual processing. Furthermore, we could identify concrete
+in individual pixels. This is insofar interesting, because the small      anatomical and neurophysiological features of the V1 model that
+indegree of stereotypical CNN units is a cornerstone of the CNN           are responsible for this.
+architecture. The control models also exhibited a power spectrum              Because we can now reproduce these two important functional
+of neural codes, like the V1 model (Fig. 5). The exponent  of the        capabilities of area V1 in a model, we have a new research platform
+power spectrum was further away from the ideal value 1 + 2/d than         at our disposal for studying how neural coding properties of the brain
+that of the V1 model (fig. S16), suggesting that these control models     emerge from its anatomical and neurophysiological features and
+are operating in a less desirable regime. However, their  values         how they are related to its visual processing capabilities. We have
+were larger than that of the V1 model. This would predict better          demonstrated here the feasibility of this new research strategy by
+noise robustness according to the underlying theory, but this             applying it to the V1 model, an analysis of its neural coding that had
+theoretical prediction is inconsistent with our previously discussed      already been used successfully for elucidating neural codes for
+empirical analysis.                                                       images in area V1 of the brain: We analyzed the eigenspectrum of
+    The LGN model also contributes to the robustness of internal          the explained variance of principal components of its neural codes
+noise. As shown in Fig. 8A, control model 1 (where the LGN model          for images. We found that the listed structural features of V1 in the
+is removed) is less robust to external noise than the V1 model with       brain do in fact induce a salient feature of its neural coding strategy:
+the LGN. Consistent with that, adding this LGN model (without             The V1 model exhibits a similar power law for neural codes of im-
+further training of its parameters) as preprocessor to the RCNN           ages as the brain. In contrast, applying the same training process to
+markedly improves its noise robustness (fig. S17). Hence, the spatio-     CNNs, CNNs exhibit a power law with a substantially slower decay
+temporal filters of this LGN model can filter out some of the noise,      of the eigenspectrum. According to the theoretical analysis of (11),
+which is consistent with the preceding results of (27).                   this implies that neural codes in CNNs are less noise robust. By regu-
+                                                                          larizing CNNs (28) or training them with different methods (24),
+                                                                          one can move the exponent of their eigenspectra closer to 1 + 2/d,
+DISCUSSION                                                                which can improve the robustness of CNNs. We have also shown
+We have demonstrated that the V1 model of (1), which arguably             that the anatomical and neurophysiological data on V1 that have
+provides the largest currently available accumulation of anatomical       been integrated into the V1 model suffice to reproduce a further
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                               11 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+                               A
+
+
+
+
+                              B
+
+
+
+
+                                                                                                                                                                                     Downloaded from https://www.science.org on November 08, 2025
+                              C
+
+
+
+
+                              D
+
+
+
+
+                                                Noise amplitude (SD)
+Fig. 8. Concrete factors of the V1 model that are responsible for its superior noise robustness. (A) Decay of accuracy of the V1 model and five control models for
+increasing amplitudes of internal noise (see Fig. 3E for a preceding analysis of this for the V1 model). One sees that both neuron diversity and laminar structure are important
+factors for the robustness of the V1 model to internal noise. (B) Orthogonality of neural coding and noise dimensions in the V1 model (see Fig. 7D) and five control models
+after training. Only control model 1 (V1 model without LGN) has similarly small projections onto the noise eigenvectors with the largest eigenvalues, i.e., for small values
+of . Neuron diversity and laminar structure turn out to be important factors for that. (C) Decay of accuracy of the V1 model and five control models for image classification
+(MNIST task) with increasing amount of noise in the visual input. Neuron diversity and laminar structure of the V1 model turn out to be also essential for the superior robustness
+of the V1 model to noise in the input. Color scheme is the same as in (A). (D) Analysis of the impact of the same noise as in (C) on neurons in the V1 model and in the RCNN
+of (25). When the SD of the pixel noise becomes larger than 1, which is the range where the performance of the RCNN becomes substantially worse than that of the V1
+model according to Fig. 6B, the output of RCNN units becomes substantially stronger affected by this input noise than the firing activity of neurons in the V1 model.
+Shaded areas in left and right represent 0.1-fold SD and SD across neurons, respectively. Inset of left panel shows the same data but for a different order of magnitude.
+
+
+salient aspect of neural coding in area V1 of the brain, where,                               On a more general level, we have shown that the V1 model of (1)
+according to (3), about 90% of the noise fluctuations in area V1 are                       can be seen as the first prototype of a new generation of neural net-
+constrained to dimensions of the population activity that are                              work models for visual processing that capture substantially more
+orthogonal to noise dimensions. We found that this is an emergent                          features of brain processing than CNNs. Further work is needed
+property of the V1 model of (1).                                                           to tease apart the functional implications of each of its structural
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                                             12 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+features and to port similar advanced brain-like visual processing          also be possible to recruit them for the design of substantially
+capabilities into simpler neural network models. Often one uses,            more energy-efficient neuromorphic implementations of visual
+instead of data-based models for neural networks of the brain, ran-         processing (34).
+domly connected recurrent networks of strongly simplified neuron
+models. In our experience, neural coding and computational prop-
+erties of recurrent neural networks vary substantially in dependence        MATERIALS AND METHODS
+on their connectivity structure and neuron models. This highlights          Neuron models
+the need to test brain-like features not only in abstract models but        We based our study on the “core” part of the point-neuron version
+also in neural network models that integrate our available knowledge        of the realistic V1 model introduced by (1). To make it gradient
+about the actual structure of these neural networks in the brain.           friendly, we replaced the hard reset of membrane potential after a
+    Our method can also be applied to investigate more detailed             spike emerges with the reduction of membrane potential zj(t)(vth − EL),
+models of V1, e.g., models that include data on the lattice of micro-       where zj(t) = 1 when neuron j fires at time t and zj(t) = 0 otherwise.
+columns of neurons in L5 (29) and on short-term plasticity (30) and         vth is the firing threshold of membrane potential. EL is the resting
+functionally salient aspects of dendritic spikes (31). It also provides     membrane potential. This causes no substantial change in the neural
+a paradigm for elucidating how anatomical and neurophysiological            response (fig. S4). We simulated each trial for 600 ms. The dynamics
+details of interconnected higher and lower brain areas carry out dis-       of the modified GLIF3 model was defined as
+tributed computations, in particular how interaction of neurons in
+superficial layers of V1 with higher cortical areas enhances visual         ​v​  j​​(t + t) =
+processing capabilities of V1. Although we have focused here on
+                                                                                                  C ( j                                j​​  ​(t + 1 ) + ​gE​  L​​  + ​I​j​  ​(t)​)​​  − ​z​  j​​(t) (​v​  th​​  − ​E​ L​​)​
+                                                                                              1 −  ​​ ​​ ​I e​​  ​(t + 1) + ​∑​ ​​ ​Im
+                                                                            ​  ​v​  j​​(t) +  ​ ─
+                                                                                                                                                                      syn
+readout neurons in L5, the sparsely firing pyramidal cells in L2/3 of                                                          m
+
+
+
+
+                                                                                                                                                                                                                                   Downloaded from https://www.science.org on November 08, 2025
+                                                                                  
+                                                                              
+                                                                             ​​                   ​                  ​                                                                                                      ​ ​​
+the trained V1 model contain already most of the information that          ​z​ j​​(t) = H(​v​  j​​(t) − ​v​  th​​)
+is needed to solve the computational tasks of the network, and hence,                                                                                                                                                      (1)
+                                                                           I​ ej​​  ​(t) = ​∑​ ​​ ​Wji​in​  ​ ​x​  i​​(t) + ​qK​quick
+                                                                                                                               j​    ​(t) + ​sK​slow
+                                                                                                                                               j​   ​
+they could potentially transmit this to higher areas: Readouts from                        i
+these neurons (which might be seen as proxies for neurons in higher
+cortical areas that receive input from V1) can be trained to solve all      where C represents the neuron capacitance, Ie is the external current,
+five tasks with high accuracy (fig. S18). A substantial body of             Isyn is the synaptic current, g is the membrane conductance, and vth
+anatomical and neurophysiological data on higher cortical areas             is the spiking threshold. ​​W​jini​  ​​is the synaptic weight from LGN neu-
+and their connectivity to V1 is currently available for that [see, e.g.,    ron i to V1 neuron j. The scales of the quick noise ​​K​jquick  ​  ​(t)​and the
+(6, 32, 33)]. We expect that deficits in visual processing capabilities     slow noise K​​​ slow
+                                                                                            j​  ​​ to neuron j are q = 2 and s = 2, respectively, unless
+of the V1 model, such as limited spatial integration of image features      otherwise stated. Kj was randomly drawn from the empirical noise
+and a relatively short working memory time span, will disappear             distribution, which will be elaborated on later. The decay factor  is
+when the V1 model is combined with models of higher brain areas.            given by e−t/, where  is the membrane time constant. t denotes
+In addition, neurons on L2/3 of the V1 model will then be placed            the discrete-time step size, which is set to 1 ms in our simulations.
+into a biologically more realistic context, where they send computa-        H denotes the Heaviside step function. To introduce a simple model
+tional results to higher areas and receive inputs from them.                of neuronal refractoriness, we further assumed that zj(t) is fixed to 0
+    The analysis of neural coding in the V1 model has produced a            after each spike of neuron j for a short refractory period depending
+number of predictions for future biological experiments. In partic-         on the neuron type. The after-spike current Im(t) was modeled as
+ular, we have shown in Fig. 7E that correlated noise reduces the
+coding fidelity of the network but does not produce an a priori             	​​I​​  m​(t + t) = ​f​​  m​ ​I​​  m​(t) + z(t)  ​I​​  m​; m = 1, … , ​Na​  sc​​​	                                                           (2)
+bound for its sensory discrimination capability [this had already been
+hypothesized by (4)]. A further prediction of our model is that the         where the multiplicative constant f m = exp (−kmt) and an additive
+PCA eigenspectrum of neural codes for inhibitory neurons does not           constant, Im. In our study, m = 1 or 2. Neuron parameters have
+obey a power law for higher dimensions (see Fig. 5H). Last, the values      been fitted to experimental data from 111 selected neurons according
+of excitatory synaptic weights in V1 are predicted to generally shrink      to the cell database of the Allen Brain Atlas (2) [see (1, 35)], including
+through training (Fig. 3A, left), while inhibitory weights are pre-         neuron capacity C, conductance g, resting potential EL, the length of
+dicted to become stronger (Fig. 3A, right).                                 the refractory period, as well as amplitudes Im and decay time con-
+    Visual processing in the brain exhibits also with regard to             stants km of two types of after-spike currents, m = 1,2.
+two aspects of physical implementation two attractive features: Most
+synaptic connections in V1 are between nearby units, which is               Synaptic inputs
+essential for an efficient physical realization of synaptic connections     The V1 model specifies the connection probability between neurons
+in neuromorphic hardware. This architectural feature is also likely         based on experimental data. The base connection probability for any
+to support faster learning (Fig. 4A). In addition, computations are         pair of neurons from the 17 cell classes is provided in (1) by a table
+carried out in V1 through event-based processing with very sparse           (shown in Fig. 1C); white grid cells denote unknown values. The
+firing activity. This computing regime not only is very energy effi-        entries in this table are based on measured frequencies of synaptic
+cient but also supports computations on tasks where temporal                connections for neurons at maximal 75-m horizontal intersomatic
+aspects play an important role, because it allows to let time repre-        distance. This base connection probability was scaled by an expo-
+sent itself in network computations. Since we have shown that both          nentially decaying factor in terms of the horizontal distance of the
+of these features can be reproduced in a corresponding neural net-          somata of the two neurons (Fig. 1D). This distance-dependent scal-
+work model for visual processing, this V1 model suggests that it will       ing is also based on statistical data from experiments (leaving aside
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                                                                                       13 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+finer details of connection probabilities). The synaptic delay was                                  LGN model
+spread in [1,4] ms, which was extracted from figure 4E of (1) and                                   The visual stimuli were preprocessed by the LGN model (Fig. 2A)
+converted to integers as the integration step is 1 ms.                                              according to (1) (it is actually meant to model preprocessing by the
+   The postsynaptic current of neuron j was defined by the follow-                                  retina and LGN in a qualitative manner). This LGN model consists of
+ing dynamics (1)                                                                                    17,400 spatiotemporal filters that model responses of LGN neurons
+                                                                                                    in mouse to visual stimuli (36). Each filter produces a positive output
+	​​I​jsyn
+       ​  ​(t + t) = ​e​​  −​ ​​  ​​​​ ​I​jsyn
+                                              ​  ​(t) + t​e​​  −​ ​​  ​​​​ ​Crise
+                                                  _
+                                                  t                       _
+                                                                           t
+                                                      syn                   syn
+                                                                               j​​  ​(t)​	    (3)   that is interpreted as firing rates of a corresponding LGN neurons.
+                                                                                                        According to the requirements of this LGN model, each visual
+	​​C​rise                −​ ​ ​  ​​​ rise      t       rec
+    j​  ​(t + t) = ​e​​   ​ ​C​j​  ​(t) + ​∑ i​ ​​ ​Wj​i​  ​ ​z​  i​​(t) ​ ─
+                                               _                                  e                 input pixel was first converted to gray scale and scaled into an interval
+                                                syn
+                                                                             ​​  syn ​​	​​   (4)
+                                                                                                    [−Int, Int], Int > 0. The output of the LGN model was injected into
+                                          ​​ jrec
+where syn is the synaptic time constant, W​   i​  ​​is the recurrent input                         the V1 model as external currents, i.e.,
+connection weight from neuron i to j, and zi is the spike of presyn-
+aptic neuron i. The syn constants depend on neuron types of pre-                                   	​​I​ sti​​  = ​W​​  in​ · LGN(​G​ Int​​)​	                                            (5)
+and postsynaptic neurons (1).
+                                                                                                    where GInt represents images scaled into [−Int, Int] for Int = 2.
+Initial conditions                                                                                  Fine orientation discrimination task
+The initial conditions of spikes and membrane potentials were zero                                  In mouse experiments, mice were trained to distinguish orientation
+unless stated otherwise. The initial conditions of Win and Wrec were                                of drifting grating stimuli (3, 4). The stimuli were presented for 750 ms
+given by the values in (1) unless stated otherwise.                                                 or longer. To reproduce this task under the limitations of graphics
+                                                                                                    processing unit GPU memory, we input drifting grating to the V1
+
+
+
+
+                                                                                                                                                                                                  Downloaded from https://www.science.org on November 08, 2025
+  Data-driven noise model                                                                           model through the LGN model for 100 ms (Fig. 2B). As in (4),
+  The noise currents ​​K quick
+                         j​​  ​(t)​ and ​​K slow
+                                            j​​  ​​in Eq. 1 were randomly drawn                     stimuli were sinusoidal drifting gratings (spatial frequency, 0.05 cy-
+  from an empirical noise distribution. The quick noise K​           ​​ jquick
+                                                                         ​  ​(t)​ was               cles per degree; drifting rate, 2 Hz). In both the training and testing
+drawn independently for all neurons in every 1 ms; the slow noise                                   processes, the orientation was uniformly drawn from [43,47]∘ (i.e.,
+​​K​jslow
+      ​  ​​was drawn independently for all neurons once 600 ms. The                                 45 ± 2) with the precision of 0. 1∘. The orientation difference was the
+  empirical noise distribution (fig. S1) was from the additive noise                                same as in (4). The initial phase was randomly sampled. The simu-
+  decoded from experimental data of mice response to 2800 nature                                    lation sequence included 50-ms delay, 100-ms drifting gratings, and
+  images (11). The decoding method was cross-validation PCA (cvPCA)                                 50-ms response window in order.
+  (11), which will be elaborated later. It measures the reliable variance                               In the response window, we defined the mean firing rate of readout
+  of stimulus-related dimensions, excluding trial-to-trial variability                              population as
+  from unrelated cognitive and/or behavioral variables or noise. We                                                                                            T
+                                                                                                                                                               ​ r​  esp​​ Nreadout
+                                                                                                                                                                 ​ ​  ​​
+                                                                                                    	​​r​  readout​​ = ─
+                                                                                                                       ​  ​              1            ​ ​  ∑​​​​  ∑​ ​​ ​z​  ​​(t)​	       (6)
+  collected the variability (additive noise) to form the empirical noise                                                  Tr​  esp​​  · ​N​ readout​​ t=1 j=1 j
+  distribution. We refer to the methods and supplementary materials
+  of (11) for a detailed mathematical analysis of this method.                                      where the sum over j is over the Nreadout = 30 readout neurons and
+                                                                                                    the sum over t is over the time length of response window Tresp =
+Readout populations                                                                                 50 ms. If r > r0 = 0.01, then this reported a network decision that the
+By default, we used 15 readout populations in the V1 model, whose                                   orientation was larger than 45∘. Otherwise, it reported that the ori-
+firing activity during the response window encoded the network de-                                  entation was smaller than 45∘.
+cisions for the five visual processing tasks. Each population consisted                             Image classification task
+of 30 randomly selected excitatory neurons in L5, located within a                                  To demonstrate that the V1 model is also able to classify images, we
+sphere of a radius of 55 m, with some distance between these spheres                               included the task to classify handwritten digits from 0 to 9 from the
+for different readout populations (fig. S3B). The results were not                                  MNIST dataset (Fig. 2C). The timing of input images and response
+sensitive to the number of neurons in each population. We tested                                    windows was the same as in the preceding task. The task was to
+populations consisting of 15 and 60 readout neurons and found that                                  decide which digit was denoted by the handwritten image (two sam-
+the performance difference is less than 0.2%. We had also shown in                                  ples for 7 and 6 are shown in Fig. 2C). Each of the 10 readout popu-
+(19) that picking just two neurons from the trained readout pool to                                 lations for this task was assigned to one of the 10 digits. The network
+produce network outputs provided almost the same accuracy for the                                   decision was taken to be that digit for which the readout population
+visual change detection task.                                                                       fired most strongly during the response window.
+    We also considered the case where the neurons in these readout                                  Visual change detection task with natural images
+populations were randomly distributed in L5 (fig. S3C), and the case                                In mouse experiments (5, 6), mice were trained to perform the
+where each population was replaced by global linear readout neurons,                                visual change detection task with natural images. A sequence of
+which received synaptic inputs from all neurons with activity (Z) in                                static natural images (250 ms), interleaved by short phases (500 ms)
+the V1 model, i.e., Yglobal = WreadoutZ + B, B is the bias (fig. S3A).                              of gray screens, was presented as visual input; mice had to report
+                                                                                                    whether the most recently presented image was the same as the pre-
+Visual processing tasks                                                                             viously presented one. To reproduce this task under the limitations
+We designed details of these five tasks to be as close as possible to                               of GPU memory, we presented natural images for 100 ms each, with
+corresponding biological experiments while keeping them as simple                                   the gray delays between them lasting for 200 ms (Fig. 2D). Note that
+as possible. Only for the image classification task (MNIST), no cor-                                the first image was presented after 50 ms. All images were selected
+responding mouse experiments exist.                                                                 from a set of 40 randomly chosen images from the ImageNet dataset
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)                   2 November 2022                                                                                                            14 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+(37). The probability that the next image differed from the preceding                        between the target firing rates, y, calculated from the model in (1),
+one was set to 50%. In case of a changed image identity, the model                           and the firing rates, r, sampled the same number of neurons from
+had to report within a time window of 50 ms length that started 150 ms                       the network model
+after image onset (response window). If the mean firing rate of the
+                                                                                                                                                    N                                       ​ℒ​  ​​(​​  j​​)
+readout population in the response window rreadout > r0, it reported                                                            ​Lr​  ate reg.​​ = ​∑​  ​​∣​​  j​​  − 𝕀 { ​​  j​​  < 0}∣​ ─
+a network decision that the image had changed. The computation                                                                                           j
+                                                                                                                                                                                                   ​, with
+                                                                                             	​​                 ​  ​  ─​  21 ​ ​2j​​  ​,                    if ∣​​  j​​∣≤  ​​	 ​                                                         (9)
+                                                                                                                    ​{​​​ (
+of the V1 model on this task has been further analyzed in (19).
+                                                                                               ​ℒ​  ​​(​​  j​​) ​=      ​                ​  1            ​                  ​​ ​
+                                                                                                                                               2 ​  ​)​​,​ otherwise
+Visual change detection task with drifting gratings                                                                          ​ ​​∣​​  j​​∣− ​ ─
+We also replaced the natural images above with static gratings that
+have different orientations and kept the input sequence the same
+(Fig. 2D). The setting of the static grating is the same as in the fine                      where j represents neuron j, N represents the number of neurons,
+orientation discrimination task, except that it is static. The changing                      j = j/N,  = 0.002, and ​​​  j​​ = ​r​  j​​  − ​r​target
+                                                                                                                                                j​     ​​. ​𝕀(x) = 1​ when x is true; ​𝕀(x) = 0​
+probability of orientation is 50%; the orientation of static gratings                        when x is false.
+was uniformly drawn in [120,150] (i.e., 135 ± 15) with the preci-                                The voltage regularization was given by
+sion of 0. 1∘.
+
+                                                                                                                N j=0 ([ ​E​ L​​
+                                                                                                                                                    ​ − 1​]​​​​  ​​)​​​​  ​  + ​​(​​[​​  − ​ ─                   1​]​​​​  ​​)​​​​  ​​	
+Evidence accumulation task                                                                                           j=N              ​v​  j​​  − ​E​ L​​
+                                                                                                                1 ​ ​ ∑​​​ ​​ ​​ ​​ ​ ─
+                                                                                                                                                                + 2                          ​v​  j​​  − ​E​ L​​         + 2
+A hallmark of cognitive computations in the brain is the capability                          ​​Lv​  reg.​​  = ​ ─                                                                                      ​E​ L ​ +
+                                                                                                                                                                                                            ​​                              (10)
+to go beyond a purely reactive mode: to integrate diverse sensory
+cues over time and to wait until the right moment arrives for an                             where N represents the total number of neurons, vj represents the
+action. A large number of experiments in neuroscience analyze                                membrane potential of neuron j, EL represents the resting membrane
+
+
+
+
+                                                                                                                                                                                                                                                    Downloaded from https://www.science.org on November 08, 2025
+neural coding after learning such tasks [see, e.g., (7, 8)]. We considered                   potential, and [⋯]+ represents rectifier function.
+the same task that was studied in the experiments of (7, 8). There, a
+rodent moved along a linear track in a virtual environment, where                            Training and testing
+it encountered several visual cues on the left and right (Fig. 2E). Later,                   We trained the model for all five tasks together. Pairs of visual
+when it arrived at a T-junction, it had to decide whether to turn left                       inputs and target outputs were collected in separate 64 batches for
+or right. The network should report the direction from which it had                          each task, and these batches were interlaced during training. Apart
+previously received most visual cues. To reproduce this task under                           from the change detection tasks, the spikes and membrane poten-
+the limitations of a GPU implementation, we used a shorter dura-                             tials were reset to 0 after each trial that consisted of 600 ms.
+tion of 600 ms for each trial. The right (left) cue was represented by                           We applied BPTT (19) to minimize the loss function. The
+                                                                                                                       ∂ ​z​ j​​
+                                                                                                                       _
+50 ms of cue image in which the black dots on the right (left) side of                       nonexisting derivative ​​ ∂ ​
+                                                                                                                         v​  j​​
+                                                                                                                                 ​​was replaced in simulations by a simple
+the maze. Visual cues were separated by 10-ms delay, and cues were                           nonlinear function of the membrane potential that is called the
+represented by the gray wall of the maze. After a delay of 250 ms,                           pseudo-derivative. Outside of the refractory period, we chose a
+the network had to decide whether more cues had been presented                               pseudo-derivative of the form
+on the left or right, using two readout populations for left and right.
+The decision was indicated by the more vigorously firing readout
+                                                                                                                                                ( ​p​  ​​  ) ​
+pool (left or right) within the response window of 50 ms.                                        ​​ ​​  t​  = ​ ─
+                                                                                                   
+                                                                                                                            ​​  pd​​
+                                                                                                                                          ​  exp​ ​​ ​  ─
+                                                                                                                                                                  ​ ​)​​  2​ ​​,​
+                                                                                                                                                        − ​(​vs​tc ​​
+                                                                                                                ​vt​  h​​  − ​E​ L​​                            2
+                                                                                             	​​                                              ​​	                                                                                           (11)
+                                                                                                                  v
+                                                                                                                  ​    ​​  t​ − ​v​  ​​
+Loss function                                                                                       t
+                                                                                                ​v s​ c​ ​  = ​ ─                     t
+                                                                                                                 ​vt​  h​​  − ​E​ L ​​​
+                                                                                                                                        h
+The loss function was defined as
+
+ L = ​Lc​  ross−entropy​​  + ​​  f​​ ​Lr​  ate reg.​​  + ​​  v​​ ​Lv​  reg.​​​	
+	​                                                                                     (7)   where the dampening factor pd = 0.5 and the Gaussian kernel width
+                                                                                              p = 0.28. During the refractory period, the pseudo-derivative
+where Lcross − entropy represents the cross-entropy loss and f and v                       was set to 0.
+represent the weights of firing rate regularization Lrate reg. and voltage                       We drew a batch of visual stimuli (in our case, batch size is 320,
+regularization Lv reg., respectively. As an example, the cross-entropy                       consisting of 64 network inputs for each of the five tasks) and calcu-
+loss of visual change detection tasks was given by                                           lated the gradient after every trial for each synaptic weight whether
+                                                                                             an increase or decrease of it (but without changing its sign) would
+	​​L​ cross−entropy​​  = − ​∑ m​ ​​  [ ​T​​  (m)​  log ((​r(m)
+                                                             ​readout​ r​  0​​  )) +
+                                                                  ​ − ​                      reduce the loss function. Weights were then updated by the average
+                       (1 − ​T​​  (m)​ ) log ((​r​ 0​​  − ​r​(m) ​ ​))]​	
+                                                               readout                 (8)   gradient across the batch. This method had originally only been
+                                                                                             applied to neuron networks with differentiable neuron models and
+where the sum over m is organized into chunks of 50 ms and                                   was normally referred to as stochastic gradient descent.
+​​r​(m) ​​​ denotes the mean readout population firing rate defined in
+    readout                                                                                      During the training, we added the sign constraint on the weights
+Eq. 6. Similarly, T(m) denotes the target output intime window m,                            of the neural network to keep Dale’s law. Specifically, if an excitatory
+  being 1 if a change in image identity should be reported and other-                        weight was updated to a negative value, it would be set to 0; vice versa.
+  wise 0. The baseline firing rate r0 was 0.01.  represents the sigmoid                         In every training run, we used a different random seed to draw
+  function.  is a trainable scale ( > 0) of firing rate.                                   fresh noise samples from the empirical distribution and for randomly
+       We also used regularization terms to penalize unrealistic firing                      generating/selecting training samples. We would like to emphasize
+  rates and unrealistic membrane voltages. Their weights, f = 0.1 and                       that we tested the trained model—whenever possible—for new
+v = 10−5. The rate regularization is given by the Huber loss (38)                           visual stimuli that had not been shown during training (this was not
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)           2 November 2022                                                                                                                                                                      15 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+possible for the gratings because there were not sufficiently many                     spatial structure with distance-dependent connection probabilities
+different visual stimuli for them). In that sense, we evaluated the                    of the V1 model, replacing them with an equal number of randomly
+generalization capability of the trained V1 model, rather than its                     chosen connections. Control model 4 is a randomly connected
+capability to handle a fixed set of stimuli correctly (which often suf-                recurrent network of standard LIF neurons (RSNN) with the same
+fices to solve behavioral tasks in experiments). The model achieved                    number of neurons and connections as the V1 model. The membrane
+on all five tasks a performance that is in the same range as reported                  constant of these LIF neurons is 10 ms, and their refractory period
+behavioral data from corresponding mouse experiments (Table 1).                        is 5 ms long. These are common values for spiking neural network
+                                                                                       models. Control model 5 is a variation of this RSNN, where excit-
+Other simulation details                                                               atory and inhibitory neurons are distinguished like in the V1 model,
+The BPTT training algorithm was coded, as the simulation of the                        and Dale’s law is observed during training. This type of model is
+model, in TensorFlow, which runs very efficiently on GPUs and also                     sometimes seen as an intermediate step from generic RSNNs toward
+on multiple GPUs for training in parallel. We used independent                         more biologically oriented network models. The detailed settings
+simulations in parallel by distributing trials for all five tasks over                 are shown in Table 2. All control models were trained in the same
+batches. Every batch consisted of 320 trials, 64 for each of the                       way as the V1 model, i.e., for the same tasks and loss function,
+five tasks. In every trial, the model of (1) was simulated for 600 ms                  including the same sparsity regularization term and using the same
+of biological time, which took, together with the calculation of gra-                  hyperparameters for training.
+dients, around 5 s on an NVIDIA A100 GPU. Once all batches had
+finished (one step), gradients were calculated and averaged to up-                     Branching ratio as a measure for criticality
+date the weights by BPTT. We define an epoch as 781 iterations/steps                   On the basis of the work of (39), where the branching ratio was
+because this represents one cycle through the full training dataset of                 recommended as a rather reliable measure for criticality of a network,
+
+
+
+
+                                                                                                                                                                              Downloaded from https://www.science.org on November 08, 2025
+MNIST. This computation had to be iterated for 16 epochs to make                       we examined this branching ratio for the V1 model. In particular,
+sure the average performance on the five tasks was saturated. This                     this measure was shown there to be more robust to subsampling.
+took 60 hours of wall clock time on 160 GPUs.                                          The branching ratio is defined as the ratio of the number of neurons
+                                                                                       spiking at time t + 1 to the number of spiking neurons at time t.
+Control models                                                                         Critical regimes, by their nature, are balanced and avoid runaway
+We used five control models in Fig. 4. In control model 1, we re-                      gain (positive or negative) and have a branching ratio of 1.0. We
+moved the LGN model and directly injected pixel values of the image                    stimulated the V1 model as in the visual change detection task of
+into the V1 model. The image was resized to a number of pixels that                    nature images for 15 s.
+roughly matched the number of LGN channels (2544). The pixel                               In a network with A active neurons at time t, if the branching
+values were scaled by a factor 0.04 to bring the resulting firing activity             ratio has a fixed value m, then ⟨At+1 ∣ At⟩ = mAt + h, where < ∣ >
+into a reasonable regime. In control model 2, we removed the diver-                    denotes the conditional expectation, m is the branching ratio, and h
+sity of the 111 data-based neuron types in the V1 model, replacing                     is a mean rate of an external drive/stimulus. Considering subsam-
+them with one generic model for excitatory neurons (the excitatory                     pling, at is proportional to At on average < at∣At⟩ = At + , where 
+neuron on L2/3, node type ID in Allen Brain Atlas: 487661754)                          and  are constants. This subsampling leads to a bias: m(2Var [At]/
+and one for inhibitory neurons (PV neuron on L2/3, node type ID:                       Var [at] − 1). Instead of using time t and t + 1, this method focuses
+484635029). In control model 3, we removed instead the laminar                         on times t and t + k with different time lags k = 1, …, kmaximum. With
+
+
+
+    Table 2. The control model settings.
+                                                                                                                        Weight sign
+    Model name                        Neuron model              Connectivity*               Neuron type†                                       Input via LGN model
+                                                                                                                        constraint
+    V1 model                                GLIF3                     V1                          V1                         Yes                        Yes
+    V1 model without LGN
+                                            GLIF3                     V1                          V1                         Yes                        No
+      (control model 1)
+    V1 model without
+      neuron diversity                      GLIF3                     V1                         1E 1I                       Yes                        Yes
+      (control model 2)
+    V1 model without
+      laminar structure                     GLIF3                  Random                         V1                         Yes                        Yes
+      (control model 3)
+    RSNN (control model 4)                  LIF‡                   Random                       Single                       No                         Yes
+    RSNN with E/I distinction
+                                             LIF                   Random                       Single                       Yes                        Yes
+      (control model 5)
+
+    *V1: the connectivity in the V1 model; random: randomly selected connectivity but the number of connectivity is fixed as in the V1 model.    †V1: The diverse
+    neuron types as in the V1 model (in total 111 types); 1E 1I: all excitatory neurons are the same (the excitatory neuron on L2/3, node type ID in Allen Brain Atlas:
+    487661754), and all inhibitory neurons are the same (PV neuron on L2/3, node type ID: 484635029); single: all neurons are the same.   ‡LIF represents
+    standard LIF neuron model.   
+
+
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                                        16 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+this, the branching ratio mk is <at+k ∣ at > = mk = 2Var [At]/                                             The first step of the cvPCA algorithm computes the eigenvectors
+Var [at]mk = bmk, where b is a constant. To compute mk with differ-                                    of the neural response covariance from one set of the trials. The
+ent k, we obtained an exponential curve and extracted m from this                                      second and third steps project the neural responses from each half
+curve. m < 1 indicates a subcritical regime; m > 1 indicates a super-                                  of the trials onto each eigenvector. The final step computes the
+critical regime; m = 1 indicates a critical regime.                                                    (scaled) variance of the neural responses when projected onto an
+                                                                                                       eigenvector (that was computed using one-half of the trials). Thus,
+Convolutional neural networks                                                                          each cross-validated eigenvalue is related to the amount of stimulus-­
+Feedforward CNN                                                                                        related variance of the neural responses along the eigenvalue’s cor-
+We used ResNet-18 (40) as FF-CNN. To calculate its eigenspectra, responding eigenvector.
+we used the pretrained version on ImageNet provided by PyTorch.                                             To be consistent with (11), we summed up spikes over 500 ms in
+To evaluate its robustness to pixel noise, we trained ResNet-18 on response to visual stimuli. We ran cvPCA 10 times on the response
+MNIST with the Adadelta optimizer. The batch size was 64; learning of the neural network fed with the same images that are used in (11).
+rate was 1; weight decay was 0.0001; the coefficient used for com- On each iteration, we randomly sampled the population responses
+puting a running average of squared gradients was 0.9; the term of each stimulus from the two repeats without replacement. We ran
+added to the denominator to improve numerical stability was 1 × 10−6; 10 different runs and found that they were very similar to each other,
+and the number of training epochs was 10.                                                              i.e., the SD was close to 0. For the trained V1 model, we calculated
+Recurrent CNN                                                                                          the eigenspectra in three models trained with different noise and
+We used the gated RCNN (25), inspired by abundant recurrent randomly generated data, and found that the SD is 5.95 × 10−5. The
+connections in the visual systems of animals. The gates control the displayed eigenspectra of the trained V1 model were averaged over
+amount of context information inputted to the neurons. We used these three models. The code is publicly available (11).
+
+
+
+
+                                                                                                                                                                                Downloaded from https://www.science.org on November 08, 2025
+the code GRCNN-55 (weight sharing). To calculate its eigenspectra, V1 model
+we used the pretrained version on ImageNet provided by (25). To We analyzed the neural representation in the trained V1 model in
+evaluate its robustness to pixel noise, we trained RCNN on MNIST the same way as responses of V1 neurons were analyzed in (11):
+with the stochastic gradient descent optimizer. The batch size was Without loss of generality, we used 2800 generic images that were
+64; the learning rate was 0.1; the momentum was 0.9; the weight randomly drawn from ImageNet validation dataset in all panels of
+decay was 0.0001; and the number of training epochs was 10.                                            Fig. 5. We also tried the 2800 nature images used in (11) and found
+Adding dropout to CNN training                                                                         that they gave rise to a slower decaying speed of eigenspectrum
+To introduce internal noise to the FF-CNN and the RCNN during (1.15); they were only used in fig. S2A to compare with the noise
+training, we independently set outputs of ReLu units with probability level in mouse V1 experiment. We also used a smaller set of 32 im-
+p to 0 using samples from a Bernoulli distribution. This procedure ages, repeated 90 times. All stimuli were input 50 ms after the sim-
+is known as dropout training (26).                                                                     ulation onset and sustained for 500 ms in each trial to be the same
+                                                                                                       as experimental procedures. They were presented twice to allow
+Eigenspectrum analysis                                                                                 cross-validated analysis. The initial condition of membrane poten-
+Cross-validation PCA                                                                                   tials and spikes was set to zeros, unless otherwise stated. We input
+Eigenspectra of V1 model were estimated by the explained variance the 2800–nature image stimuli five times with different random
+of the neural response along with the nth principal component seeds that were used to draw the noise and initial conditions of
+(computed from the first presentation). It is achieved by cvPCA that membrane potential and after-spike current from uniform distribu-
+computes the covariance of the projections of neural responses for tions. We found that the results were not sensitive to the initial con-
+the two repeats onto this component. cvPCA measures the reliable dition and noise.
+variance of stimulus-related dimensions, excluding trial-to-trial Convolutional neural networks
+variability from unrelated cognitive and/or behavioral variables or Generic images were resized so that their shorter dimension was
+noise. It accomplishes this by computing the covariance of responses 256 pixels and then center-cropped to 224 × 224 pixels. Padding the
+between two presentations of an identical stimulus ensemble (fig. image and resizing it to 224 × 224 pixels achieved similar results.
+S2B). Because only stimulus-related activity will be correlated across Images were additionally preprocessed by normalizing each image
+presentations, cvPCA provides an unbiased estimate of the stimulus-­ channel (Red Green Blue channels) using the mean and SDs that
+related variance. Briefly, the algorithm operates as follows                                           were used during model training (mean, 0.485, 0.456, and 0.406; SD,
+                                                                                                       0.229, 0.224, and 0.225). For gray images, we repeated it to three
+          ​X​​  (1)​  = ​USV​​ ⊤​(singular value decomposition)                                        channels. Using these preprocessed images, we extracted activation
+      ​​  ˜​​​  ​ = ​X​​  ​  V (project data onto eigenvectors)
+      X         (1)          (1)                                                                       from every layer of each CNN and computed their eigenspectra
+	​​​​   
+          
+      X        
+          ˜​​​  ​ = ​X​​  ​  V
+                (2)          (2)         ​                                           ​            ​​   using PCA because artificial neural responses are deterministic.
+                           s       (1) (2)
+                                 ˜ij​​ ​  ​ ​​ X
+                                               ˜ij​​ ​  ​, for j ∈ {1, … , C} (compute eigenvalue)     Power-law fitting of eigenspectra
+     ​    ​  j​​  = ​ ∑​​ ​​ ​  X
+                          i=1                                                                          Using the least-squares method, we fit power laws to the eigenspectra,
+                                                                                                       f(n), against PC dimension, n. The fitting function is f(n) = n−(n ∈
+                      (1)    (2)                 S×N
+where X , X ∈ ℝ                                              (S is the number of stimuli, and N is the [nmin, nmax]), where nmin and nmax are lower and higher bounds,
+number of neurons) are the neural responses for the first and second respectively. For most cases, we chose nmin ∈ [1,20] and nmax ∈
+half of the trials (and averaged across trials), V ∈ ℝN × C are the [301,2800]. For the 32-grating recordings, owing to noise and the
+C eigenvectors of the covariance matrix of X(1), and  ∈ ℝC are the length ofthe spectrum, we chose nmin ∈ [1,10] and nmax ∈ [14,35].
+cross-validated eigenvalues associated with each of the eigenvectors For each possible pair of nmin and nmax, we estimated the exponent
+(j is the jth eigenvalue).                                                                             and its goodness-of-fit by the coefficient of determination (R2).
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)   2 November 2022                                                                                                        17 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+We then selected the estimate of nmin, nmax, and  that gave the maxi-                                                             eigenvector ​​​ e→​​  ​​​. The eigenvectors well aligned with  are the most
+mum R2 (>0.99) over all possibilities.                                                                                             important for discriminating between the two distributions of neu-
+                                                                                                                                   ral responses.
+Discriminability index d′ for neural responses
+to visual stimuli                                                                                                                  SUPPLEMENTARY MATERIALS
+To estimate how much information the neural activity conveyed                                                                      Supplementary material for this article is available at https://science.org/doi/10.1126/
+about the stimulus identity, following (3), we used the metric d′,                                                                 sciadv.abq7592
+which characterizes how readily the distributions of the neural                                                                    View/request a protocol for this paper from Bio-protocol.
+responses to the two different sensory stimuli can be distinguished
+(41). The quantity (d′)2 is the discrete analog of Fisher information (42).                                                        REFERENCES AND NOTES
+    In Fig. 7 (A and E), to be consistent with the experimental study                                                               1. Y. N. Billeh, B. Cai, S. L. Gratiy, K. Dai, R. Iyer, N. W. Gouwens, R. Abbasi-Asl, X. Jia, J. H. Siegle,
+                                                                                                                                       S. R. Olsen, C. Koch, S. Mihalas, A. Arkhipov, Systematic integration of structural
+(3), we calculated the neural response as the spike counts in each                                                                     and functional data into multi-scale models of mouse primary visual cortex. Neuron 106,
+bin of 200 ms and evaluated two different approaches to compute d′                                                                     388–403.e18 (2020).
+values for the discrimination of the two different visual stimuli                                                                   2. Allen Institute for Brain Science, Allen Cell Types Database, Cell Feature Search (2018);
+(gratings in the fine orientation discrimination task); the difference                                                                 celltypes.brain-map.org/data.
+                                                                                                                                    3. O. I. Rumyantsev, J. A. Lecoq, O. Hernandez, Y. Zhang, J. Savall, R. Chrapkiewicz, J. Li,
+between two gratings is 2°; each stimulus was presented in 500 trials.
+                                                                                                                                       H. Zeng, S. Ganguli, M. J. Schnitzer, Fundamental bounds on the fidelity of sensory cortical
+We analyzed the neural responses in a specific time bin relative to                                                                    coding. Nature 580, 100–105 (2020).
+the onset of visual stimulation, which was called as instantaneous                                                                  4. C. Stringer, M. Michaelos, D. Tsyboulski, S. E. Lindo, M. Pachitariu, High-precision coding
+decoding approach used in (3). The alternative way, cumulative de-                                                                     in visual cortex. Cell 184, 2767–2778.e15 (2021).
+coding, i.e., analyzing neural responses that were concatenated over                                                                5. M. Garrett, S. Manavi, K. Roll, D. R. Ollerenshaw, P. A. Groblewski, N. D. Ponvert,
+
+
+
+
+                                                                                                                                                                                                                                                  Downloaded from https://www.science.org on November 08, 2025
+                                                                                                                                       J. T. Kiggins, L. Casal, K. Mace, A. Williford, A. Leon, X. Jia, P. Ledochowitsch, M. A. Buice,
+time from the start of the trial up to a chosen time, demonstrated                                                                     W. Wakeman, S. Mihalas, S. R. Olsen, Experience shapes activity dynamics and stimulus
+similar results. To determine d′ accurately despite having about fewer                                                                 coding of VIP inhibitory cells. eLife 9, e50340 (2020).
+trials than neuron number in the V1 model, we reduced dimension by                                                                  6. J. H. Siegle, X. Jia, S. Durand, S. Gale, C. Bennett, N. Graddis, G. Heller, T. K. Ramirez,
+using PLS analysis (43) to identify and retain only five population                                                                    H. Choi, J. A. Luviano, P. A. Groblewski, R. Ahmed, A. Arkhipov, A. Bernard, Y. N. Billeh,
+                                                                                                                                       D. Brown, M. A. Buice, N. Cain, S. Caldejon, L. Casal, A. Cho, M. Chvilicek, T. C. Cox, K. Dai,
+vector dimensions in which the stimuli were highly distinguish-
+                                                                                                                                       D. J. Denman, S. E. J. de Vries, R. Dietzman, L. Esposito, C. Farrell, D. Feng, J. Galbraith,
+able as in (3). In this 5D representation, the neural dynamics evoked                                                                  M. Garrett, E. C. Gelfand, N. Hancock, J. A. Harris, R. Howard, B. Hu, R. Hytnen, R. Iyer,
+by the two stimuli become distinguishable over the first 200 ms of                                                                     E. Jessett, K. Johnson, I. Kato, J. Kiggins, S. Lambert, J. Lecoq, P. Ledochowitsch, J. H. Lee,
+stimulus presentation. In the reduced space, we calculated the                                                                         A. Leon, Y. Li, E. Liang, F. Long, K. Mace, J. Melchior, D. Millman, T. Mollenkopf, C. Nayan,
+(d′)2 value of the optimal linear discrimination strategy as                                                                           L. Ng, K. Ngo, T. Nguyen, P. R. Nicovich, K. North, G. K. Ocker, D. Ollerenshaw, M. Oliver,
+                                                                                                                                       M. Pachitariu, J. Perkins, M. Reding, D. Reid, M. Robertson, K. Ronellenfitch, S. Seid,
+                                                                                                                                       C. Slaughterbeck, M. Stoecklin, D. Sullivan, B. Sutton, J. Swapp, C. Thompson, K. Turner,
+	​​(​d′ ​)​​  2​  =  ​​​  T​ ​Σ​​  −1​   =  ​​​  T​ ​w​ opt​​​	                                                  (12)            W. Wakeman, J. D. Whitesell, D. Williams, A. Williford, R. Young, H. Zeng, S. Naylor,
+                                                                                                                                       J. W. Phillips, R. C. Reid, S. Mihalas, S. R. Olsen, C. Koch, Survey of spiking in the mouse
+where Σ​ = ​1_2​(​Σ​  A​​  + ​Σ​  B​​)​is the noise covariance matrix averaged across                                                  visual system reveals functional hierarchy. Nature 592, 86–92 (2021).
+                                                                                                                                    7. A. S. Morcos, C. D. Harvey, History-dependent variability in population dynamics during
+two stimulation conditions,  = A − B is the vector difference
+                                                                                                                                       evidence accumulation in cortex. Nat. Neurosci. 19, 1672–1681 (2016).
+between the mean ensemble neural responses to the two stimuli,                                                                      8. B. Engelhard, J. Finkelstein, J. Cox, W. Fleming, H. J. Jang, S. Ornelas, S. A. Koay,
+and wopt = Σ−1, which is normal to the optimal linear discrimination                                                                 S. Y. Thiberge, N. D. Daw, D. W. Tank, I. B. Witten, Specialized coding of sensory, motor
+hyperplane in the response space (42). Each entry of a covariance                                                                      and cognitive variables in vta dopamine neurons. Nature 570, 509–513 (2019).
+matrix is the covariance of spike counts of two neurons ai and_bi                                                                   9. A. L. Barth, J. F. Poulet, Experimental evidence for sparse firing in the neocortex.
+                                                                                                      _                                Trends Neurosci. 35, 345–355 (2012).
+(i ∈ {1,2, ⋯, N}, N is the number of trials): _                   ​​  1 ​ ​∑ N   i=1​​​(​a​  i​​  − ​ a ​) (​bi​  ​​  − ​ b ​)​,
+          _                                                       N−1                                                              10. J. Wilting, V. Priesemann, 25 years of criticality in neuroscience–established results, open
+where x​​  ​​is the mean of {xi}.                                                                                                      controversies, novel concepts. Curr. Opin. Neurobiol. 58, 105–111 (2019).
+    We also calculated ​​(​d​  ′shuffled   ​)​​ ​ 2​​, the optimal linear discrimination                                           11. C. Stringer, M. Pachitariu, N. Steinmetz, M. Carandini, K. D. Harris, High-dimensional
+performance using trial-shuffled datasets, which we created by                                                                         geometry of population responses in visual cortex. Nature 571, 361–365 (2019).
+                                                                                                                                   12. N. C. L. Kong, E. Margalit, J. L. Gardner, A. M. Norcia, Increasing neural network robustness
+shuffling the responses of each cell across stimulation trials of the
+                                                                                                                                       improves match to macaque v1 eigenspectrum, spatial frequency preference and
+same stimulus. Owing to this shuffling procedure, the off-diagonal                                                                     predictivity. PLOS Comput. Biol. 18, e1009739 (2022).
+elements of ΣA and ΣB became near zero. ​​(​d​  ′shuffled               ​)​​ ​ 2​​ increased much                                  13. A. Arieli, A. Sterkin, A. Grinvald, A. Aertsen, Dynamics of ongoing activity: Explanation
+faster with the increase of sampled neurons than did (d′)2.                                                                            of the large variability in evoked cortical responses. Science 273, 1868–1871 (1996).
+    In Fig. 7B, noise eigenvalue  and its eigenvector ​​​ e→​​  ​​​ were calcu-                                                 14. J. S. Montijn, M. Vinck, C. Pennartz, Population coding in mouse visual cortex: Response
+                                                                                                                                       reliability and dissociability of stimulus tuning and noise correlation. Front. Comput.
+lated by eigendecomposition of noise covariance matrix Σ. In Fig. 7C,                                                                  Neurosci. 8, 58 (2014).
+to quantify the signals projected onto the eigenvector e​​​ →​​  ​​​, we pro-                                                     15. S. Haeusler, K. Schuch, W. Maass, Motif distribution, dynamical properties,
+jected  onto ​​​ e→​​  ​​​and calculated its norm ​∣ ·  ​​ e→​​  ​​∣.​ In Fig. 7D, to                                            and computational performance of two data-based cortical microcircuit templates.
+demonstrate that training makes signaling dimensions more                                                                              J. Physiol. Paris 103, 73–87 (2009).
+                                                                                                                                   16. W. Maass, T. Natschläger, H. Markram, Real-time computing without stable states: A new
+orthogonal to the largest noise dimension, we decompose (d′)2 into
+                                                                                                                                       framework for neural computation based on perturbations. Neural Comput. 14,
+a sum of projections                                                                                                                   2531–2560 (2002).
+
+	​​​(​d′ ​)​​  2​  =  ​​​  T​ ​Σ​​  −1​   = ​∑​ ​​​(​​─                               )​​​​	
+                                                                 ​∣ · ​​ e→​​  ​​∣​​  2​                                        17. W. Maass, H. Markram, On the computational power of circuits of spiking neurons.
+                                                              ​         ​​   ​​
+                                                                              ​​                                       (13)            J. Comput. Syst. Sci. 69, 593–616 (2004).
+                                                                                                                                  18. K. D. Harris, G. M. G. Shepherd, The neocortical circuit: Themes and variations. Nat. Neurosci.
+    Because     ​  · ​​ e→​​  ​​​corresponds to the signal projected on noise                                                       18, 170–181 (2015).
+eigenvector e​​​  →​​  ​​​ and noise eigenvalue  corresponds to the noise
+                                                                         
+                                                                                                                                   19. F. Scherr, W. Maass, Analysis of the computational strategy of a detailed laminar cortical
+                           ​∣ · ​​ e→​​  ​​∣​​  ​
+                                    2                                                                                                  microcircuit model for solving the image-change-detection task. bioRxiv 2021.11.17.469025
+scale on ​​​ e→​​  ​​​, ​​_   ​​  ​​
+                                         ​​can be interpreted as singal-to-noise ratio on                                              [Preprint]. 19 November 2021. https://doi.org/10.1101/2021.11.17.469025.
+
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)                       2 November 2022                                                                                                                                                    18 of 19
+SCIENCE ADVANCES | RESEARCH ARTICLE
+
+20. G. Bellec, D. Salaj, A. Subramoney, R. Legenstein, W. Maass, Long short-term memory and                   F. L. Pereira, R. Perin, F. Petitjean, R. Ranjan, M. Reimann, L. Soltuzu, M. F. Sy, M. Anıl Tuncel,
+    learning-to-learn in networks of spiking neurons. arXiv:1803.09574 [cs.NE] (26 March                      A. Ulbrich, M. Wolf, F. Clascá, H. Markram, S. L. Hill, Thalamic control of sensory
+    2018).                                                                                                    enhancement and sleep spindle properties in a biophysical model of thalamoreticular
+21. D. L. Ringach, P. J. Mineault, E. Tring, N. D. Olivas, P. Garcia-Junco-Clemente,                          microcircuitry. bioRxiv 2022.02.28.482273 [Preprint]. 14 April 2022. https://doi.
+    J. T. Trachtenberg, Spatial clustering of tuning in mouse primary visual cortex. Nat. Commun.             org/10.1101/2022.02.28.482273.
+    7, 12270 (2016).                                                                                    34.   A. Rao, P. Plank, A. Wild, W. Maass, A long short-term memory for ai applications
+22. T. Mora, W. Bialek, Are biological systems poised at criticality? J. Stat. Phys. 144, 268–302             in spike-based neuromorphic hardware. Nat. Mach. Intell. 4, 467–479 (2022).
+    (2011).                                                                                             35.   C. Teeter, R. Iyer, V. Menon, N. Gouwens, D. Feng, J. Berg, A. Szafer, N. Cain, H. Zeng,
+23. W. L. Shew, D. Plenz, The functional benefits of criticality in the cortex. Neuroscientist 19,            M. Hawrylycz, C. Koch, S. Mihalas, Generalized leaky integrate-and-fire models classify
+    88–100 (2013).                                                                                            multiple neuron types. Nat. Commun. 9, 709 (2018).
+24. A. Ghosh, A. Mondal, K. Agrawal, B. Richards, Investigating power laws in deep                      36.   S. Durand, R. Iyer, K. Mizuseki, S. de Vries, S. Mihalas, R. C. Reid, A comparison of visual
+    representation learning. arXiv:2202.05808 [cs.LG] (11 February 2022).                                     response properties in the lateral geniculate nucleus and primary visual cortex of awake
+25. J. Wang, X. Hu, Convolutional neural networks with gated recurrent connections. IEEE Trans.               and anesthetized mice. J. Neurosci. 36, 12144–12156 (2016).
+    Pattern Anal. Mach. Intell. 44, 3421–3435 (2021).                                                   37.   J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, L. Fei-Fei, ImageNet: A large-scale hierarchical
+26. N. Srivastava, G. Hinton, A. Krizhevsky, I. Sutskever, R. Salakhutdinov, Dropout: A simple                image database, in 2009 IEEE Conference on Computer Vision and Pattern Recognition
+    way to prevent neural networks from overfitting. J. Mach. Learn. Res. 15, 1929–1958                       (IEEE, 2009), pp. 248–255.
+    (2014).                                                                                             38.   P. J. Huber, Robust estimation of a location parameter, in Breakthroughs in Statistics
+27. J. Dapello, T. Marques, M. Schrimpf, F. Geiger, D. Cox, J. J. DiCarlo, Simulating a primary               (Springer, 1992), pp. 492–518.
+    visual cortex at the front of cnns improves robustness to image perturbations. Adv.                 39.   J. Wilting, V. Priesemann, On the ground state of spiking network activity in mammalian
+    Neural Inf. Process. Syst. 33, 13073–13087 (2020).                                                        cortex. arXiv:1804.07864 (2018).
+28. J. Nassar, P. Sokol, S. Chung, K. D. Harris, I. M. Park, On 1/n neural representation and           40.   K. He, X. Zhang, S. Ren, J. Sun, Deep residual learning for image recognition, in
+    robustness. Adv. Neural Inf. Process. Syst. 33, 6211–6222 (2020).                                         Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (IEEE, 2016),
+29. H. Maruoka, N. Nakagawa, S. Tsuruno, S. Sakai, T. Yoneda, T. Hosoya, Lattice system                       pp. 770–778.
+    of functionally distinct cell types in the neocortex. Science 358, 610–615 (2017).                  41.   C. M. Bishop, Pattern Recognition and Machine Learning (Information Science and Statistics)
+
+
+
+
+                                                                                                                                                                                                                    Downloaded from https://www.science.org on November 08, 2025
+30. L. Campagnola, S. C. Seeman, T. Chartrand, L. Kim, A. Hoggarth, C. Gamlin, S. Ito, J. Trinh,              (Springer, ed. 1, 2007).
+    P. Davoudian, C. Radaelli, M.-H. Kim, T. Hage, T. Braun, L. Alfiler, J. Andrade, P. Bohn,           42.   B. B. Averbeck, D. Lee, Effects of noise correlations on information encoding and decoding.
+    R. Dalley, A. Henry, S. Kebede, M. Alice, D. Sandman, G. Williams, R. Larsen, C. Teeter,                  J. Neurophysiol. 95, 3633–3644 (2006).
+    T. L. Daigle, K. Berry, N. Dotson, R. Enstrom, M. Gorham, M. Hupp, S. D. Lee, K. Ngo,               43.   P. Geladi, B. R. Kowalski, Partial least-squares regression: A tutorial. Anal. Chim. Acta 185,
+    P. R. Nicovich, L. Potekhina, S. Ransford, A. Gary, J. Goldy, D. M. Millen, T. Pham, M. Tieu,             1–17 (1986).
+    L. Siverts, M. Walker, C. Farrell, M. Schroedter, C. Slaughterbeck, C. Cobb, R. Ellenbogen,         44.   J. Wilting, V. Priesemann, Inferring collective dynamical states from widely unobserved
+    R. P. Gwinn, C. D. Keene, A. L. Ko, J. G. Ojemann, D. L. Silbergeld, D. Carey, T. Casper,                 systems. Nat. Commun. 9, 2325 (2018).
+    K. Crichton, M. Clark, N. Dee, L. Ellingwood, J. Gloe, M. Kroll, J. Sulc, H. Tung, K. Wadhwani,     45.   S.-H. Lee, A. C. Kwan, S. Zhang, V. Phoumthipphavong, J. G. Flannery, S. C. Masmanidis,
+    K. Brouner, T. Egdorf, M. Maxwell, M. M. Graw, C. A. Pom, A. Ruiz, J. Bomben, D. Feng,                    H. Taniguchi, Z. J. Huang, F. Zhang, E. S. Boyden, K. Deisseroth, Y. Dan, Activation
+    N. Hejazinia, S. Shi, A. Szafer, W. Wakeman, J. Phillips, A. Bernard, L. Esposito, F. D. D'Orazi,         of specific interneurons improves V1 feature selectivity and visual perception. Nature
+    S. Sunkin, K. Smith, B. Tasic, A. Arkhipov, S. Sorensen, E. Lein, C. Koch, G. Murphy, H. Zeng,            488, 379–383 (2012).
+    T. Jarsky, Local connectivity and synaptic dynamics in mouse and human neocortex.                   46.   L. L. Glickfeld, M. H. Histed, J. H. Maunsell, Mouse primary visual cortex is used to detect
+    Science 375, eabj5861 (2022).                                                                             both orientation and contrast changes. J. Neurosci. 33, 19416–19422 (2013).
+31. M. E. Larkum, J. Wu, S. A. Duverdin, A. Gidon, The guide to dendritic spikes of the
+    mammalian cortex in vitro and in vivo. Neuroscience 489, 15–33 (2022).
+32. L. Campagnola, S. C. Seeman, T. Chartrand, L. Kim, A. Hoggarth, C. Gamlin, S. Ito, J. Trinh,        Acknowledgments: We would like to thank E. Kadile, D. Kai, O. Kolner, C. Stöckl, and Y. Wu for
+    P. Davoudian, C. Radaelli, M.-H. Kim, T. Hage, T. Braun, L. Alfiler, J. Andrade, P. Bohn,           helpful comments on an earlier version of the manuscript. Furthermore, we would like to
+    R. Dalley, A. Henry, S. Kebede, A. Mukora, D. Sandman, G. Williams, R. Larsen, C. Teeter,           thank S. Diaz for advice and help regarding large-scale computations. Funding: Most
+    T. L. Daigle, K. Berry, N. Dotson, R. Enstrom, M. Gorham, M. Hupp, S. D. Lee, K. Ngo,               computations were carried out on the Human Brain Project PCP Pilot Systems at the Jülich
+    R. Nicovich, L. Potekhina, S. Ransford, A. Gary, J. Goldy, D. M. Millen, T. Pham, M. Tieu,          Supercomputing Centre, which received cofunding from the European Union (grant
+    L. Siverts, M. Walker, C. Farrell, M. Schroedter, C. Slaughterbeck, C. Cobb, R. Ellenbogen,         agreement number 604102). This research was partially supported by the Human Brain Project
+    R. P. Gwinn, C. D. Keene, A. L. Ko, J. G. Ojemann, D. L. Silbergeld, D. Carey, T. Casper,           (grant agreement number 785907) of the European Union and a grant from Intel. Author
+    K. Crichton, M. Clark, N. Dee, L. Ellingwood, J. Gloe, M. Kroll, J. Sulc, H. Tung, K. Wadhwani,     contributions: G.C. and W.M. designed the study. G.C. and F.S. built the software. G.C.
+    K. Brouner, T. Egdorf, M. Maxwell, M. M. Graw, C. A. Pom, A. Ruiz, J. Bomben, D. Feng,              performed the experiments and analyses. G.C. and W.M. wrote the paper. Competing
+    N. Hejazinia, S. Shi, A. Szafer, W. Wakeman, J. Phillips, A. Bernard, L. Esposito, F. D. D'Orazi,   interests: The authors declare that they have no competing interests. Data and materials
+    S. Sunkin, K. Smith, B. Tasic, A. Arkhipov, S. Sorensen, E. Lein, C. Koch, G. Murphy, H. Zeng,      availability: All data needed to evaluate the conclusions in the paper are present in the paper
+    T. Jarsky, Local connectivity and synaptic dynamics in mouse and human neocortex.                   and/or the Supplementary Materials.
+    Science 375, eabj5861 (2021).
+33. E. Iavarone, J. Simko, Y. Shi, M. Bertschy, M. García-Amado, P. Litvak, A.-K. Kaufmann,             Submitted 28 April 2022
+    C. O’Reilly, O. Amsalem, M. Abdellah, G. Chevtchenko, B. Coste, J.-D. Courcol, A. Ecker,            Accepted 15 September 2022
+    C. Favreau, A. C. Fleury, W. Van Geit, M. Gevaert, N. R. Guerrero, J. Herttuainen, G. Ivaska,       Published 2 November 2022
+    S. Kerrien, J. G. King, P. Kumbhar, P. Lurie, I. Magkanaris, V. R. Muddapu, J. Nair,                10.1126/sciadv.abq7592
+
+
+
+
+Chen et al., Sci. Adv. 8, eabq7592 (2022)         2 November 2022                                                                                                                                     19 of 19
+

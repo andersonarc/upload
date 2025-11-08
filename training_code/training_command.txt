@@ -1,0 +1,1 @@
+python multi_training.py --data_dir GLIF_network --restore_from checkpoints --nocurrent_input --batch_size 4

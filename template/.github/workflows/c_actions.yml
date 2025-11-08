@@ -1,0 +1,87 @@
+# Copyright (c) 2020 The University of Manchester
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This workflow will install Python dependencies, run tests, lint and rat with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: C Actions
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Checkout SupportScripts
+      uses: actions/checkout@v2
+      with:
+        repository: SpiNNakerManchester/SupportScripts
+        path: support
+
+    - name: Install Ubuntu packages
+      uses: SpiNNakerManchester/SupportScripts/actions/apt-get-install@main
+      with:
+        packages: doxygen gcc-arm-none-eabi
+    - name: Configure Python 3.12
+      # Note: Python is needed for spinn_utilities.make_tools when building
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.12
+
+    - name: Set environment variables
+      run: |
+        echo "SPINN_DIRS=$PWD/spinnaker_tools" >> $GITHUB_ENV
+        echo "NEURAL_MODELLING_DIRS=$PWD/sPyNNaker/neural_modelling" >> $GITHUB_ENV
+
+    - name: Checkout SpiNNaker C Dependencies
+      uses: SpiNNakerManchester/SupportScripts/actions/install-spinn-deps@main
+      with:
+        # Note: SpiNNUtils needed for spinn_utilities.make_tools
+        repositories: >
+          spinnaker_tools spinn_common SpiNNFrontEndCommon sPyNNaker
+
+    - name: "Prepare: Install SpiNNUtils"
+      uses: SpiNNakerManchester/SupportScripts/actions/install-spinn-deps@main
+      with:
+        # Note: SpiNNUtils needed for spinn_utilities.make_tools
+        repositories: SpiNNUtils
+        install: true
+
+    - name: "Check: Lint C lib code using Vera++"
+      # Note: run this before building to avoid linting modified_src directories
+      uses: SpiNNakerManchester/SupportScripts/actions/vera@main
+      with:
+        base-dir: c_models/src
+
+    - name: Build SpiNNaker C dependencies
+      run: |
+        make -C $SPINN_DIRS
+        make -C spinn_common install
+        make -C SpiNNFrontEndCommon/c_common install
+
+    - name: Build C code
+      run: make
+      working-directory: c_models
+      env:
+        CFLAGS: -fdiagnostics-color=always
+
+    - name: Build C code in DEBUG mode
+      run: make clean; make SPYNNAKER_DEBUG=DEBUG
+      working-directory: c_models
+      env:
+        CFLAGS: -fdiagnostics-color=always
+
+    # To be added: Documentation building
+
+    # Note: This workflow does not run the C code; that'd be an integration test
