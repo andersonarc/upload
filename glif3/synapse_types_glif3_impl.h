@@ -128,32 +128,23 @@ static inline const char *synapse_types_get_type_char(index_t synapse_type_index
     }
 }
 
+// Debug functions disabled to save ITCM space (~40 bytes)
+// Uncomment for debugging if needed
 static inline void synapse_types_print_input(synapse_types_t *parameters) {
-    io_printf(IO_BUF, "%12.6k - %12.6k - %12.6k - %12.6k",
-            parameters->syn_0.synaptic_input_value,
-            parameters->syn_1.synaptic_input_value,
-            parameters->syn_2.synaptic_input_value,
-            parameters->syn_3.synaptic_input_value);
+    use(parameters);
+    // io_printf(IO_BUF, "%12.6k - %12.6k - %12.6k - %12.6k",
+    //         parameters->syn_0.synaptic_input_value,
+    //         parameters->syn_1.synaptic_input_value,
+    //         parameters->syn_2.synaptic_input_value,
+    //         parameters->syn_3.synaptic_input_value);
 }
 
-// Simplified debug output to save space
 static inline void synapse_types_print_parameters(synapse_types_t *parameters) {
-    log_info("syn_0: decay=%R init=%R val=%11.4k\n",
-        (unsigned fract) parameters->syn_0.decay,
-        (unsigned fract) parameters->syn_0.init,
-        parameters->syn_0.synaptic_input_value);
-    log_info("syn_1: decay=%R init=%R val=%11.4k\n",
-        (unsigned fract) parameters->syn_1.decay,
-        (unsigned fract) parameters->syn_1.init,
-        parameters->syn_1.synaptic_input_value);
-    log_info("syn_2: decay=%R init=%R val=%11.4k\n",
-        (unsigned fract) parameters->syn_2.decay,
-        (unsigned fract) parameters->syn_2.init,
-        parameters->syn_2.synaptic_input_value);
-    log_info("syn_3: decay=%R init=%R val=%11.4k\n",
-        (unsigned fract) parameters->syn_3.decay,
-        (unsigned fract) parameters->syn_3.init,
-        parameters->syn_3.synaptic_input_value);
+    use(parameters);
+    // log_info("syn_0: decay=%R init=%R val=%11.4k\n",
+    //     (unsigned fract) parameters->syn_0.decay,
+    //     (unsigned fract) parameters->syn_0.init,
+    //     parameters->syn_0.synaptic_input_value);
 }
 
 #endif  // _SYNAPSE_TYPES_GLIF3_IMPL_H_
