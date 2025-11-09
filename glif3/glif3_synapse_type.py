@@ -87,8 +87,9 @@ class GLIF3SynapseType(AbstractSynapseType):
             isyn_3_rise=0.0,
             isyn_3=0.0):
 
-        # Define the struct layout - must match C implementation exactly
-        # C implementation has 8 state variables (4 rise + 4 current)
+        # Define the struct layout - must match C synapse_types_params_t exactly
+        # Parameters: 4 tau values + 4 init_input values (for current, not rise)
+        # State: 8 variables (4 rise + 4 current) declared separately via add_state_variables
         super().__init__(
             [Struct([
                 (DataType.S1615, TAU_SYN_0),
@@ -103,10 +104,8 @@ class GLIF3SynapseType(AbstractSynapseType):
             {
                 TAU_SYN_0: "ms", TAU_SYN_1: "ms",
                 TAU_SYN_2: "ms", TAU_SYN_3: "ms",
-                ISYN_0_RISE: "nA", ISYN_0: "nA",
-                ISYN_1_RISE: "nA", ISYN_1: "nA",
-                ISYN_2_RISE: "nA", ISYN_2: "nA",
-                ISYN_3_RISE: "nA", ISYN_3: "nA"
+                ISYN_0: "nA", ISYN_1: "nA",
+                ISYN_2: "nA", ISYN_3: "nA"
             })
 
         # Store parameters
