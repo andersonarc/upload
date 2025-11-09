@@ -103,20 +103,22 @@ static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t 
 
 static void synapse_types_shape_input(synapse_types_t *p) {
     // Match TensorFlow line 319: new_psc = psc * decay + dt * decay * OLD_psc_rise
-    // CRITICAL: With sub-stepping, psc_rise_prev must stay constant across ALL sub-steps
-    // It holds the value from END of previous FULL timestep (before neuron_transfer adds spikes)
+    // CRITICAL: With sub-stepping, must use ts (sub-timestep) not dt (full timestep)
+    // Otherwise contribution gets added N times (once per sub-step) instead of once total
+    // psc_rise_prev stays constant across ALL sub-steps (from END of previous FULL timestep)
     REAL dt = p->dt;
+    REAL ts = kdivui(dt, p->n_steps_per_timestep);  // Sub-timestep duration
 
     // Compute new psc using previous FULL timestep's psc_rise values
-    // (this stays constant across all sub-steps, matching TensorFlow's atomic update)
+    // Each sub-step adds ts*decay*psc_rise_prev, totaling to ~dt*decay*psc_rise_prev after N sub-steps
     p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
-                                     decay_s1615(dt * p->syn_0_rise_prev, p->syn_0.decay);
+                                     decay_s1615(ts * p->syn_0_rise_prev, p->syn_0.decay);
     p->syn_1.synaptic_input_value = decay_s1615(p->syn_1.synaptic_input_value, p->syn_1.decay) +
-                                     decay_s1615(dt * p->syn_1_rise_prev, p->syn_1.decay);
+                                     decay_s1615(ts * p->syn_1_rise_prev, p->syn_1.decay);
     p->syn_2.synaptic_input_value = decay_s1615(p->syn_2.synaptic_input_value, p->syn_2.decay) +
-                                     decay_s1615(dt * p->syn_2_rise_prev, p->syn_2.decay);
+                                     decay_s1615(ts * p->syn_2_rise_prev, p->syn_2.decay);
     p->syn_3.synaptic_input_value = decay_s1615(p->syn_3.synaptic_input_value, p->syn_3.decay) +
-                                     decay_s1615(dt * p->syn_3_rise_prev, p->syn_3.decay);
+                                     decay_s1615(ts * p->syn_3_rise_prev, p->syn_3.decay);
 
     // Decay psc_rise for next sub-step
     exp_shaping(&p->syn_0_rise);
