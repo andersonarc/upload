@@ -6,22 +6,18 @@ from spynnaker.pyNN.utilities.struct import Struct
 from spynnaker.pyNN.data.spynnaker_data_view import SpynnakerDataView
 
 # Parameter and state variable names
-TAU_SYN_0_RISE = 'tau_syn_0_rise'
 TAU_SYN_0 = 'tau_syn_0'
-TAU_SYN_1_RISE = 'tau_syn_1_rise'
 TAU_SYN_1 = 'tau_syn_1'
-TAU_SYN_2_RISE = 'tau_syn_2_rise'
 TAU_SYN_2 = 'tau_syn_2'
-TAU_SYN_3_RISE = 'tau_syn_3_rise'
 TAU_SYN_3 = 'tau_syn_3'
 ISYN_0_RISE = 'isyn_0_rise'
-ISYN_0 = 'isyn_0'
+ISYN_0_MAIN = 'isyn_0_main'
 ISYN_1_RISE = 'isyn_1_rise'
-ISYN_1 = 'isyn_1'
+ISYN_1_MAIN = 'isyn_1_main'
 ISYN_2_RISE = 'isyn_2_rise'
-ISYN_2 = 'isyn_2'
+ISYN_2_MAIN = 'isyn_2_main'
 ISYN_3_RISE = 'isyn_3_rise'
-ISYN_3 = 'isyn_3'
+ISYN_3_MAIN = 'isyn_3_main'
 TIMESTEP_MS = 'timestep_ms'
 
 
@@ -70,37 +66,30 @@ class GLIF3SynapseType(AbstractSynapseType):
             isyn_3=0.0):
 
         # Define the struct layout - must match C implementation exactly
-        # Double-exponential synapses: 8 exp_params_t (rise and main for each of 4 receptors)
-        # Each exp_params_t contains: tau, init_input
-        # For alpha synapses, rise and main share the same tau value
+        # 4 double_exp_params_t structs (one per receptor)
+        # Each double_exp_params_t contains: tau, init_rise, init_main
         super().__init__(
             [Struct([
-                (DataType.S1615, TAU_SYN_0_RISE), # syn_0_rise.tau
-                (DataType.S1615, ISYN_0_RISE),    # syn_0_rise.init_input
                 (DataType.S1615, TAU_SYN_0),      # syn_0.tau
-                (DataType.S1615, ISYN_0),         # syn_0.init_input
-                (DataType.S1615, TAU_SYN_1_RISE), # syn_1_rise.tau
-                (DataType.S1615, ISYN_1_RISE),    # syn_1_rise.init_input
+                (DataType.S1615, ISYN_0_RISE),    # syn_0.init_rise
+                (DataType.S1615, ISYN_0_MAIN),    # syn_0.init_main
                 (DataType.S1615, TAU_SYN_1),      # syn_1.tau
-                (DataType.S1615, ISYN_1),         # syn_1.init_input
-                (DataType.S1615, TAU_SYN_2_RISE), # syn_2_rise.tau
-                (DataType.S1615, ISYN_2_RISE),    # syn_2_rise.init_input
+                (DataType.S1615, ISYN_1_RISE),    # syn_1.init_rise
+                (DataType.S1615, ISYN_1_MAIN),    # syn_1.init_main
                 (DataType.S1615, TAU_SYN_2),      # syn_2.tau
-                (DataType.S1615, ISYN_2),         # syn_2.init_input
-                (DataType.S1615, TAU_SYN_3_RISE), # syn_3_rise.tau
-                (DataType.S1615, ISYN_3_RISE),    # syn_3_rise.init_input
+                (DataType.S1615, ISYN_2_RISE),    # syn_2.init_rise
+                (DataType.S1615, ISYN_2_MAIN),    # syn_2.init_main
                 (DataType.S1615, TAU_SYN_3),      # syn_3.tau
-                (DataType.S1615, ISYN_3),         # syn_3.init_input
+                (DataType.S1615, ISYN_3_RISE),    # syn_3.init_rise
+                (DataType.S1615, ISYN_3_MAIN),    # syn_3.init_main
                 (DataType.S1615, TIMESTEP_MS)])],
             {
-                TAU_SYN_0_RISE: "ms", TAU_SYN_0: "ms",
-                TAU_SYN_1_RISE: "ms", TAU_SYN_1: "ms",
-                TAU_SYN_2_RISE: "ms", TAU_SYN_2: "ms",
-                TAU_SYN_3_RISE: "ms", TAU_SYN_3: "ms",
-                ISYN_0_RISE: "nA", ISYN_0: "nA",
-                ISYN_1_RISE: "nA", ISYN_1: "nA",
-                ISYN_2_RISE: "nA", ISYN_2: "nA",
-                ISYN_3_RISE: "nA", ISYN_3: "nA"
+                TAU_SYN_0: "ms", TAU_SYN_1: "ms",
+                TAU_SYN_2: "ms", TAU_SYN_3: "ms",
+                ISYN_0_RISE: "nA", ISYN_0_MAIN: "nA",
+                ISYN_1_RISE: "nA", ISYN_1_MAIN: "nA",
+                ISYN_2_RISE: "nA", ISYN_2_MAIN: "nA",
+                ISYN_3_RISE: "nA", ISYN_3_MAIN: "nA"
             })
 
         # Store parameters
@@ -220,27 +209,22 @@ class GLIF3SynapseType(AbstractSynapseType):
         return "synapse_0", "synapse_1", "synapse_2", "synapse_3"
 
     def add_parameters(self, parameters):
-        # Add parameters (time constants)
-        # For alpha synapses, rise and main use the same tau
-        parameters[TAU_SYN_0_RISE] = self._tau_syn_0
+        # Add parameters (time constants only, no duplication)
         parameters[TAU_SYN_0] = self._tau_syn_0
-        parameters[TAU_SYN_1_RISE] = self._tau_syn_1
         parameters[TAU_SYN_1] = self._tau_syn_1
-        parameters[TAU_SYN_2_RISE] = self._tau_syn_2
         parameters[TAU_SYN_2] = self._tau_syn_2
-        parameters[TAU_SYN_3_RISE] = self._tau_syn_3
         parameters[TAU_SYN_3] = self._tau_syn_3
         parameters[TIMESTEP_MS] = (
             SpynnakerDataView.get_simulation_time_step_ms())
 
     def add_state_variables(self, state_variables):
         # Add state variables (initial synaptic currents for both rise and main)
-        # Rise components start at 0 for alpha synapses
+        # Rise components start at 0 for double-exponential synapses
         state_variables[ISYN_0_RISE] = 0.0
-        state_variables[ISYN_0] = self._isyn_0
+        state_variables[ISYN_0_MAIN] = self._isyn_0
         state_variables[ISYN_1_RISE] = 0.0
-        state_variables[ISYN_1] = self._isyn_1
+        state_variables[ISYN_1_MAIN] = self._isyn_1
         state_variables[ISYN_2_RISE] = 0.0
-        state_variables[ISYN_2] = self._isyn_2
+        state_variables[ISYN_2_MAIN] = self._isyn_2
         state_variables[ISYN_3_RISE] = 0.0
-        state_variables[ISYN_3] = self._isyn_3
+        state_variables[ISYN_3_MAIN] = self._isyn_3
