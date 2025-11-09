@@ -64,8 +64,12 @@ struct neuron_t {
     REAL exp_k1_dt;           // exp(-k1 * dt)
     REAL exp_k0_tref;         // exp(-k0 * t_ref)
     REAL exp_k1_tref;         // exp(-k1 * t_ref)
-    REAL dt_over_cm;          // dt / C_m
-    REAL g_dt_over_cm;        // g * dt / C_m
+    REAL dt_over_cm;          // dt / C_m (unused with exp integration)
+    REAL g_dt_over_cm;        // g * dt / C_m (unused with exp integration)
+
+    // Exponential Euler integration (matches TensorFlow)
+    REAL v_decay;             // exp(-dt * g / C_m)
+    REAL current_factor;      // (1 - v_decay) / g
 
     // Refractory period tracking
     uint32_t refract_timer;   // Refractory period timer (in time steps)
@@ -103,6 +107,13 @@ static inline void neuron_model_initialise(neuron_t *state, neuron_params_t *par
     state->exp_k1_tref = expk(-state->k1 * state->t_ref);
     state->dt_over_cm = dt / state->C_m;
     state->g_dt_over_cm = state->g * dt / state->C_m;
+
+    // Exponential Euler integration (matches TensorFlow line 171-172)
+    // tau = C_m / g, decay = exp(-dt / tau) = exp(-dt * g / C_m)
+    REAL tau = state->C_m / state->g;
+    state->v_decay = expk(-dt / tau);
+    // current_factor = (1/C_m) * (1 - decay) * tau = (1 - decay) / g
+    state->current_factor = (ONE - state->v_decay) / state->g;
 
     // Calculate refractory period in time steps
     state->refract_steps = (uint32_t) (state->t_ref * n_steps_per_timestep);
@@ -142,11 +153,12 @@ static state_t neuron_model_state_update(
     REAL I_total = total_exc - total_inh + external_bias + neuron->I_offset + current_offset
                    + neuron->I_asc_0 + neuron->I_asc_1;
 
-    // Update membrane voltage using current ASC values
-    // dV/dt = (1/C_m) * [I_total - g*(V - E_L)]
-    // V(t+dt) = V(t) + (dt/C_m) * [I_total - g*(V(t) - E_L)]
-    REAL leak_current = neuron->g * (neuron->V - neuron->E_L);
-    neuron->V += neuron->dt_over_cm * (I_total - leak_current);
+    // Update membrane voltage using exponential Euler integration (matches TensorFlow)
+    // TensorFlow line 330-334:
+    // new_v = v * decay + current_factor * (input_current + asc_1 + asc_2 + g*E_L)
+    REAL g_times_EL = neuron->g * neuron->E_L;
+    neuron->V = neuron->V * neuron->v_decay +
+                neuron->current_factor * (I_total + g_times_EL);
 
     // Update after-spike currents (exponential decay) for next timestep
     neuron->I_asc_0 *= neuron->exp_k0_dt;
