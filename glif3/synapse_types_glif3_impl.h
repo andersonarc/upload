@@ -26,6 +26,8 @@ struct synapse_types_params_t {
 struct synapse_types_t {
     exp_state_t syn_0_rise, syn_0, syn_1_rise, syn_1, syn_2_rise, syn_2, syn_3_rise, syn_3;
     REAL dt;  // Timestep in ms (needed for TensorFlow line 319 compatibility)
+    // Previous timestep's psc_rise values (TensorFlow line 319 uses OLD psc_rise)
+    input_t syn_0_rise_prev, syn_1_rise_prev, syn_2_rise_prev, syn_3_rise_prev;
 };
 
 #define NUM_EXCITATORY_RECEPTORS 4
@@ -68,6 +70,12 @@ static void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t 
 
     // Store dt for use in shape_input (TensorFlow line 319 compatibility)
     s->dt = p->time_step_ms;
+
+    // Initialize previous psc_rise values to current values
+    s->syn_0_rise_prev = s->syn_0_rise.synaptic_input_value;
+    s->syn_1_rise_prev = s->syn_1_rise.synaptic_input_value;
+    s->syn_2_rise_prev = s->syn_2_rise.synaptic_input_value;
+    s->syn_3_rise_prev = s->syn_3_rise.synaptic_input_value;
 }
 
 static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t *p) {
@@ -84,25 +92,31 @@ static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t 
 
 static void synapse_types_shape_input(synapse_types_t *p) {
     // Match TensorFlow line 319: new_psc = psc * decay + dt * decay * OLD_psc_rise
-    // Use OLD psc_rise (before decay), then decay it after
-    // NOTE: dt factor is critical! TensorFlow includes this (line 319)
+    // CRITICAL: psc_rise_prev holds value from END of previous timestep (after decay, before new spikes added)
+    // TensorFlow line 318-319 compute new values using OLD values on RHS
     REAL dt = p->dt;
 
+    // Compute new psc using previous timestep's psc_rise values (before neuron_transfer added current spikes)
     p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
-                                     decay_s1615(dt * p->syn_0_rise.synaptic_input_value, p->syn_0.decay);
-    exp_shaping(&p->syn_0_rise);
-
+                                     decay_s1615(dt * p->syn_0_rise_prev, p->syn_0.decay);
     p->syn_1.synaptic_input_value = decay_s1615(p->syn_1.synaptic_input_value, p->syn_1.decay) +
-                                     decay_s1615(dt * p->syn_1_rise.synaptic_input_value, p->syn_1.decay);
-    exp_shaping(&p->syn_1_rise);
-
+                                     decay_s1615(dt * p->syn_1_rise_prev, p->syn_1.decay);
     p->syn_2.synaptic_input_value = decay_s1615(p->syn_2.synaptic_input_value, p->syn_2.decay) +
-                                     decay_s1615(dt * p->syn_2_rise.synaptic_input_value, p->syn_2.decay);
-    exp_shaping(&p->syn_2_rise);
-
+                                     decay_s1615(dt * p->syn_2_rise_prev, p->syn_2.decay);
     p->syn_3.synaptic_input_value = decay_s1615(p->syn_3.synaptic_input_value, p->syn_3.decay) +
-                                     decay_s1615(dt * p->syn_3_rise.synaptic_input_value, p->syn_3.decay);
+                                     decay_s1615(dt * p->syn_3_rise_prev, p->syn_3.decay);
+
+    // Decay psc_rise for next timestep
+    exp_shaping(&p->syn_0_rise);
+    exp_shaping(&p->syn_1_rise);
+    exp_shaping(&p->syn_2_rise);
     exp_shaping(&p->syn_3_rise);
+
+    // Save decayed psc_rise values to prev for next timestep (AFTER decay, ready for next timestep)
+    p->syn_0_rise_prev = p->syn_0_rise.synaptic_input_value;
+    p->syn_1_rise_prev = p->syn_1_rise.synaptic_input_value;
+    p->syn_2_rise_prev = p->syn_2_rise.synaptic_input_value;
+    p->syn_3_rise_prev = p->syn_3_rise.synaptic_input_value;
 }
 
 static inline void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_t input) {
