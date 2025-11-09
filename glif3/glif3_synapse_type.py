@@ -10,13 +10,9 @@ TAU_SYN_0 = 'tau_syn_0'
 TAU_SYN_1 = 'tau_syn_1'
 TAU_SYN_2 = 'tau_syn_2'
 TAU_SYN_3 = 'tau_syn_3'
-ISYN_0_RISE = 'isyn_0_rise'
 ISYN_0 = 'isyn_0'
-ISYN_1_RISE = 'isyn_1_rise'
 ISYN_1 = 'isyn_1'
-ISYN_2_RISE = 'isyn_2_rise'
 ISYN_2 = 'isyn_2'
-ISYN_3_RISE = 'isyn_3_rise'
 ISYN_3 = 'isyn_3'
 TIMESTEP_MS = 'timestep_ms'
 
@@ -48,20 +44,12 @@ class GLIF3SynapseType(AbstractSynapseType):
         Time constant for synapse type 2 (NMDA) (ms). Default: 5.0
     tau_syn_3 : float
         Time constant for synapse type 3 (GABA_B) (ms). Default: 5.0
-    isyn_0_rise : float
-        Initial rise state for synapse 0 (nA). Default: 0.0
     isyn_0 : float
         Initial current for synapse 0 (nA). Default: 0.0
-    isyn_1_rise : float
-        Initial rise state for synapse 1 (nA). Default: 0.0
     isyn_1 : float
         Initial current for synapse 1 (nA). Default: 0.0
-    isyn_2_rise : float
-        Initial rise state for synapse 2 (nA). Default: 0.0
     isyn_2 : float
         Initial current for synapse 2 (nA). Default: 0.0
-    isyn_3_rise : float
-        Initial rise state for synapse 3 (nA). Default: 0.0
     isyn_3 : float
         Initial current for synapse 3 (nA). Default: 0.0
 
@@ -78,13 +66,9 @@ class GLIF3SynapseType(AbstractSynapseType):
             tau_syn_1=5.0,
             tau_syn_2=5.0,
             tau_syn_3=5.0,
-            isyn_0_rise=0.0,
             isyn_0=0.0,
-            isyn_1_rise=0.0,
             isyn_1=0.0,
-            isyn_2_rise=0.0,
             isyn_2=0.0,
-            isyn_3_rise=0.0,
             isyn_3=0.0):
 
         # Define the struct layout - must match C synapse_types_params_t exactly
@@ -114,14 +98,10 @@ class GLIF3SynapseType(AbstractSynapseType):
         self._tau_syn_2 = tau_syn_2
         self._tau_syn_3 = tau_syn_3
 
-        # Store state variables (all 8: rise + current for each synapse)
-        self._isyn_0_rise = isyn_0_rise
+        # Store state variables (current values only)
         self._isyn_0 = isyn_0
-        self._isyn_1_rise = isyn_1_rise
         self._isyn_1 = isyn_1
-        self._isyn_2_rise = isyn_2_rise
         self._isyn_2 = isyn_2
-        self._isyn_3_rise = isyn_3_rise
         self._isyn_3 = isyn_3
 
     # Property getters and setters for tau_syn parameters
@@ -159,28 +139,12 @@ class GLIF3SynapseType(AbstractSynapseType):
 
     # Property getters and setters for isyn state variables
     @property
-    def isyn_0_rise(self):
-        return self._isyn_0_rise
-
-    @isyn_0_rise.setter
-    def isyn_0_rise(self, isyn_0_rise):
-        self._isyn_0_rise = isyn_0_rise
-
-    @property
     def isyn_0(self):
         return self._isyn_0
 
     @isyn_0.setter
     def isyn_0(self, isyn_0):
         self._isyn_0 = isyn_0
-
-    @property
-    def isyn_1_rise(self):
-        return self._isyn_1_rise
-
-    @isyn_1_rise.setter
-    def isyn_1_rise(self, isyn_1_rise):
-        self._isyn_1_rise = isyn_1_rise
 
     @property
     def isyn_1(self):
@@ -191,28 +155,12 @@ class GLIF3SynapseType(AbstractSynapseType):
         self._isyn_1 = isyn_1
 
     @property
-    def isyn_2_rise(self):
-        return self._isyn_2_rise
-
-    @isyn_2_rise.setter
-    def isyn_2_rise(self, isyn_2_rise):
-        self._isyn_2_rise = isyn_2_rise
-
-    @property
     def isyn_2(self):
         return self._isyn_2
 
     @isyn_2.setter
     def isyn_2(self, isyn_2):
         self._isyn_2 = isyn_2
-
-    @property
-    def isyn_3_rise(self):
-        return self._isyn_3_rise
-
-    @isyn_3_rise.setter
-    def isyn_3_rise(self, isyn_3_rise):
-        self._isyn_3_rise = isyn_3_rise
 
     @property
     def isyn_3(self):
