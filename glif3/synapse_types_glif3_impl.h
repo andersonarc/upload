@@ -47,7 +47,7 @@ static inline void synapse_types_save_state(synapse_types_t *s, synapse_types_pa
     p->syn_3.init_input = s->syn_3.synaptic_input_value;
 }
 
-static inline void synapse_types_shape_input(synapse_types_t *p) {
+static void synapse_types_shape_input(synapse_types_t *p) {
     p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
                                      decay_s1615(p->syn_0_rise.synaptic_input_value, p->syn_0.decay);
     exp_shaping(&p->syn_0_rise);
@@ -62,7 +62,7 @@ static inline void synapse_types_shape_input(synapse_types_t *p) {
     exp_shaping(&p->syn_3_rise);
 }
 
-static inline void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_t input) {
+static void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_t input) {
     switch(i) {
         case 0: add_input_exp(&p->syn_0_rise, input); return;
         case 1: add_input_exp(&p->syn_1_rise, input); return;
