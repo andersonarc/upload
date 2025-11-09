@@ -40,7 +40,7 @@ static void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t 
     decay_and_init(&s->syn_3, &p->syn_3, p->time_step_ms, n);
 }
 
-static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t *p) {
+static inline void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t *p) {
     p->syn_0.init_input = s->syn_0.synaptic_input_value;
     p->syn_1.init_input = s->syn_1.synaptic_input_value;
     p->syn_2.init_input = s->syn_2.synaptic_input_value;
@@ -66,12 +66,11 @@ static void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_
     switch(i) {
         case 0: add_input_exp(&p->syn_0_rise, input); return;
         case 1: add_input_exp(&p->syn_1_rise, input); return;
-        case 2: add_input_exp(&p->syn_2_rise, input); return;
     }
-    add_input_exp(&p->syn_3_rise, input);
+    add_input_exp(i == 2 ? &p->syn_2_rise : &p->syn_3_rise, input);
 }
 
-static input_t* synapse_types_get_excitatory_input(input_t *e, synapse_types_t *p) {
+static inline input_t* synapse_types_get_excitatory_input(input_t *e, synapse_types_t *p) {
     e[0] = p->syn_0.synaptic_input_value;
     e[1] = p->syn_1.synaptic_input_value;
     e[2] = p->syn_2.synaptic_input_value;
