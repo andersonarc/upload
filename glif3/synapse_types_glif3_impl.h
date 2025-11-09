@@ -66,9 +66,9 @@ static void synapse_types_save_state(synapse_types_t *state,
 }
 
 #define ALPHA_SHAPE(syn) do { \
-    exp_shaping(&p->syn##_rise); \
     p->syn.synaptic_input_value = decay_s1615(p->syn.synaptic_input_value, p->syn.decay) + \
                                    decay_s1615(p->syn##_rise.synaptic_input_value, p->syn.decay); \
+    exp_shaping(&p->syn##_rise); \
 } while(0)
 
 static void synapse_types_shape_input(synapse_types_t *p) {
