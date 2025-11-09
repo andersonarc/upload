@@ -89,6 +89,55 @@ static inline void synapse_types_add_neuron_input(
 
 ---
 
+## 🔧 MEMORY OPTIMIZATION ITERATIONS
+
+The alpha synapse implementation doubled state variables (8 instead of 4), initially causing ITCM overflow. Through multiple optimization iterations, the code was progressively reduced:
+
+### Optimization History
+
+1. **Initial implementation** (commit cac849a): ITCM overflow by 316 bytes
+   - Used individual fields: `syn_0_rise`, `syn_0`, `syn_1_rise`, `syn_1`, etc.
+   - Separate code blocks for each synapse
+
+2. **Macro-based optimization** (commit 149bfab): Reduced to 36 bytes overflow
+   - Created `SHAPE_ALPHA_SYNAPSE` and `GET_ALPHA_CURRENT` macros
+   - Eliminated code duplication while keeping individual fields
+
+3. **Debug output disabled** (commit 9d500a8): Still 36 bytes overflow
+   - Made all `synapse_types_print_*` functions no-ops
+   - Simplified `synapse_types_get_type_char` to return constant
+
+4. **Array-based refactor** (commit 8e07ffd): **Current version**
+   - Changed to `rise[4]` and `curr[4]` arrays
+   - Used for-loops instead of macros
+   - Most compact representation possible while maintaining correctness
+
+### Final Implementation
+
+```c
+struct synapse_types_t {
+    exp_state_t rise[4];  // C_rise for each synapse
+    exp_state_t curr[4];  // I_syn for each synapse
+};
+
+static inline void synapse_types_shape_input(synapse_types_t *p) {
+    for (uint32_t i = 0; i < 4; i++) {
+        exp_shaping(&p->rise[i]);
+        p->curr[i].synaptic_input_value =
+            decay_s1615(p->curr[i].synaptic_input_value, p->curr[i].decay) +
+            decay_s1615(p->rise[i].synaptic_input_value, p->curr[i].decay);
+    }
+}
+```
+
+**If further optimization is needed:**
+- Try `-Os` compiler flag (optimize for size) instead of default
+- Add `__attribute__((optimize("Os")))` to specific functions
+- Prevent loop unrolling with `#pragma GCC unroll 0`
+- Consider moving constant data to DTCM memory region
+
+---
+
 ## ✅ ADDITIONAL FIX: PyNN Voltage Initialization
 
 ### The Problem
@@ -206,7 +255,12 @@ cd glif3/
 # The model should be registered in your sPyNNaker installation
 ```
 
-**Note:** The implementation has been optimized to fit in SpiNNaker's limited ITCM memory. The code uses macros to reduce duplication and simplified debug output to minimize code size while preserving alpha synapse dynamics.
+**Note:** The implementation has been heavily optimized to fit in SpiNNaker's limited ITCM memory:
+- **Array-based refactor**: Uses `rise[4]` and `curr[4]` arrays with for-loops instead of individual fields
+- **Disabled debug output**: All print functions are no-ops to save code space
+- **Simplified implementation**: Removed all non-essential code while preserving alpha synapse dynamics
+
+The latest implementation (commit 8e07ffd) uses compact loops which should generate smaller code than macro expansions. This is the most memory-efficient approach while maintaining mathematical correctness.
 
 ### 2. Run Updated Simulation
 
