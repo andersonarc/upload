@@ -10,9 +10,13 @@ TAU_SYN_0 = 'tau_syn_0'
 TAU_SYN_1 = 'tau_syn_1'
 TAU_SYN_2 = 'tau_syn_2'
 TAU_SYN_3 = 'tau_syn_3'
+ISYN_0_RISE = 'isyn_0_rise'
 ISYN_0 = 'isyn_0'
+ISYN_1_RISE = 'isyn_1_rise'
 ISYN_1 = 'isyn_1'
+ISYN_2_RISE = 'isyn_2_rise'
 ISYN_2 = 'isyn_2'
+ISYN_3_RISE = 'isyn_3_rise'
 ISYN_3 = 'isyn_3'
 TIMESTEP_MS = 'timestep_ms'
 
@@ -44,20 +48,28 @@ class GLIF3SynapseType(AbstractSynapseType):
         Time constant for synapse type 2 (NMDA) (ms). Default: 5.0
     tau_syn_3 : float
         Time constant for synapse type 3 (GABA_B) (ms). Default: 5.0
+    isyn_0_rise : float
+        Initial rise state for synapse 0 (nA). Default: 0.0
     isyn_0 : float
         Initial current for synapse 0 (nA). Default: 0.0
+    isyn_1_rise : float
+        Initial rise state for synapse 1 (nA). Default: 0.0
     isyn_1 : float
         Initial current for synapse 1 (nA). Default: 0.0
+    isyn_2_rise : float
+        Initial rise state for synapse 2 (nA). Default: 0.0
     isyn_2 : float
         Initial current for synapse 2 (nA). Default: 0.0
+    isyn_3_rise : float
+        Initial rise state for synapse 3 (nA). Default: 0.0
     isyn_3 : float
         Initial current for synapse 3 (nA). Default: 0.0
 
     Notes
     -----
     The C implementation maintains both rise (C_rise) and current (I_syn) state
-    variables for each synapse, but only the current values are exposed to Python
-    as they are the relevant output. Rise variables are initialized to zero.
+    variables for each synapse. All 8 state variables (4 rise + 4 current) must
+    be declared to Python for correct memory allocation on SpiNNaker.
     """
 
     def __init__(
@@ -66,14 +78,17 @@ class GLIF3SynapseType(AbstractSynapseType):
             tau_syn_1=5.0,
             tau_syn_2=5.0,
             tau_syn_3=5.0,
+            isyn_0_rise=0.0,
             isyn_0=0.0,
+            isyn_1_rise=0.0,
             isyn_1=0.0,
+            isyn_2_rise=0.0,
             isyn_2=0.0,
+            isyn_3_rise=0.0,
             isyn_3=0.0):
 
         # Define the struct layout - must match C implementation exactly
-        # Note: C implementation has 8 state variables (4 rise + 4 current)
-        # but we only expose the 4 current values to Python
+        # C implementation has 8 state variables (4 rise + 4 current)
         super().__init__(
             [Struct([
                 (DataType.S1615, TAU_SYN_0),
@@ -88,8 +103,10 @@ class GLIF3SynapseType(AbstractSynapseType):
             {
                 TAU_SYN_0: "ms", TAU_SYN_1: "ms",
                 TAU_SYN_2: "ms", TAU_SYN_3: "ms",
-                ISYN_0: "nA", ISYN_1: "nA",
-                ISYN_2: "nA", ISYN_3: "nA"
+                ISYN_0_RISE: "nA", ISYN_0: "nA",
+                ISYN_1_RISE: "nA", ISYN_1: "nA",
+                ISYN_2_RISE: "nA", ISYN_2: "nA",
+                ISYN_3_RISE: "nA", ISYN_3: "nA"
             })
 
         # Store parameters
@@ -98,10 +115,14 @@ class GLIF3SynapseType(AbstractSynapseType):
         self._tau_syn_2 = tau_syn_2
         self._tau_syn_3 = tau_syn_3
 
-        # Store state variables
+        # Store state variables (all 8: rise + current for each synapse)
+        self._isyn_0_rise = isyn_0_rise
         self._isyn_0 = isyn_0
+        self._isyn_1_rise = isyn_1_rise
         self._isyn_1 = isyn_1
+        self._isyn_2_rise = isyn_2_rise
         self._isyn_2 = isyn_2
+        self._isyn_3_rise = isyn_3_rise
         self._isyn_3 = isyn_3
 
     # Property getters and setters for tau_syn parameters
@@ -218,9 +239,13 @@ class GLIF3SynapseType(AbstractSynapseType):
             SpynnakerDataView.get_simulation_time_step_ms())
 
     def add_state_variables(self, state_variables):
-        # Add state variables (initial synaptic currents)
-        # Note: Rise variables are handled internally by C code and start at 0
+        # Add ALL 8 state variables (4 rise + 4 current) for correct memory allocation
+        # Order must match C struct: syn_0_rise, syn_0, syn_1_rise, syn_1, ...
+        state_variables[ISYN_0_RISE] = self._isyn_0_rise
         state_variables[ISYN_0] = self._isyn_0
+        state_variables[ISYN_1_RISE] = self._isyn_1_rise
         state_variables[ISYN_1] = self._isyn_1
+        state_variables[ISYN_2_RISE] = self._isyn_2_rise
         state_variables[ISYN_2] = self._isyn_2
+        state_variables[ISYN_3_RISE] = self._isyn_3_rise
         state_variables[ISYN_3] = self._isyn_3
