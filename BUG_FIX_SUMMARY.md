@@ -206,6 +206,8 @@ cd glif3/
 # The model should be registered in your sPyNNaker installation
 ```
 
+**Note:** The implementation has been optimized to fit in SpiNNaker's limited ITCM memory. The code uses macros to reduce duplication and simplified debug output to minimize code size while preserving alpha synapse dynamics.
+
 ### 2. Run Updated Simulation
 
 The notebook `jupyter/spinnaker.py` is already updated. Simply run:
