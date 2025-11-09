@@ -68,8 +68,8 @@ class GLIF3SynapseType(AbstractSynapseType):
     Notes
     -----
     The C implementation maintains both rise (C_rise) and current (I_syn) state
-    variables for each synapse. All 8 state variables (4 rise + 4 current) must
-    be declared to Python for correct memory allocation on SpiNNaker.
+    variables for each synapse (8 total). Only current values (4) are declared
+    as state variables in Python; rise values always initialize to 0 in C code.
     """
 
     def __init__(
@@ -88,8 +88,8 @@ class GLIF3SynapseType(AbstractSynapseType):
             isyn_3=0.0):
 
         # Define the struct layout - must match C synapse_types_params_t exactly
-        # Parameters: 4 tau values + 4 init_input values (for current, not rise)
-        # State: 8 variables (4 rise + 4 current) declared separately via add_state_variables
+        # Parameters: 4 tau values + 4 init_input values (for current only)
+        # State: Only 4 current values declared; rise always starts at 0
         super().__init__(
             [Struct([
                 (DataType.S1615, TAU_SYN_0),
