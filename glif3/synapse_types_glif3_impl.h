@@ -49,7 +49,6 @@ typedef enum input_buffer_regions {
     decay_and_init(&state->syn, &params->syn, params->time_step_ms, n_steps_per_timestep); \
 } while(0)
 
-__attribute__((optimize("Os")))
 static inline void synapse_types_initialise(synapse_types_t *state,
         synapse_types_params_t *params, uint32_t n_steps_per_timestep) {
     ALPHA_INIT(state, params, syn_0);
@@ -72,7 +71,6 @@ static inline void synapse_types_save_state(synapse_types_t *state,
                                    decay_s1615(p->syn##_rise.synaptic_input_value, p->syn.decay); \
 } while(0)
 
-__attribute__((optimize("Os")))
 static inline void synapse_types_shape_input(synapse_types_t *p) {
     ALPHA_SHAPE(syn_0);
     ALPHA_SHAPE(syn_1);
