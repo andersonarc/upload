@@ -19,10 +19,14 @@ TIMESTEP_MS = 'timestep_ms'
 
 class GLIF3SynapseType(AbstractSynapseType):
     """
-    Synapse type for GLIF3 model with 4 independent exponential synapses.
+    Synapse type for GLIF3 model with 4 independent alpha (double-exponential) synapses.
 
-    This allows for 4 different receptor types, each with its own time constant.
-    All synapses use exponential decay.
+    This implements the synapse dynamics from Chen et al. (2022) Equation 3:
+      C_rise(t+dt) = exp(-dt/tau) * C_rise(t) + (e/tau) * weight * spike
+      I_syn(t+dt) = exp(-dt/tau) * I_syn(t) + dt * exp(-dt/tau) * C_rise(t)
+
+    Each synapse has a rise phase followed by exponential decay, providing more
+    realistic temporal dynamics than simple exponential synapses.
 
     Receptor Types (Allen Institute convention):
     - Type 0 (AMPA): Fast excitatory
@@ -48,6 +52,12 @@ class GLIF3SynapseType(AbstractSynapseType):
         Initial current for synapse 2 (nA). Default: 0.0
     isyn_3 : float
         Initial current for synapse 3 (nA). Default: 0.0
+
+    Notes
+    -----
+    The C implementation maintains both rise (C_rise) and current (I_syn) state
+    variables for each synapse, but only the current values are exposed to Python
+    as they are the relevant output. Rise variables are initialized to zero.
     """
 
     def __init__(
@@ -62,8 +72,8 @@ class GLIF3SynapseType(AbstractSynapseType):
             isyn_3=0.0):
 
         # Define the struct layout - must match C implementation exactly
-        # Each synapse has: tau (decay), init_input (initial current)
-        # Plus timestep_ms for all synapses
+        # Note: C implementation has 8 state variables (4 rise + 4 current)
+        # but we only expose the 4 current values to Python
         super().__init__(
             [Struct([
                 (DataType.S1615, TAU_SYN_0),
@@ -209,6 +219,7 @@ class GLIF3SynapseType(AbstractSynapseType):
 
     def add_state_variables(self, state_variables):
         # Add state variables (initial synaptic currents)
+        # Note: Rise variables are handled internally by C code and start at 0
         state_variables[ISYN_0] = self._isyn_0
         state_variables[ISYN_1] = self._isyn_1
         state_variables[ISYN_2] = self._isyn_2

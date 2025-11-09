@@ -747,6 +747,11 @@ def setup():
 #    CON = 14 # count
 
 def G2D(g):
+    """Convert GLIF3 parameters to PyNN GLIF3Curr cell parameters.
+
+    Note: Initial values (v, i_asc_0, i_asc_1) are set separately via initial_values
+    parameter as per PyNN specification, not in cellparams.
+    """
     return {
         'c_m': g[G.CM],
         'e_l': g[G.EL],
@@ -759,11 +764,22 @@ def G2D(g):
         'k1': g[G.K1],
         't_ref': g[G.RFR],
         'i_offset': 0.0,
-        'v': g[G.EL],
         'tau_syn_0': g[G.TA0],
         'tau_syn_1': g[G.TA1],
         'tau_syn_2': g[G.TA2],
         'tau_syn_3': g[G.TA3],
+    }
+
+def G2IV(g):
+    """Get GLIF3 initial values for state variables.
+
+    Returns initial values dict for PyNN Population initialization.
+    Matches TensorFlow initialization in models.py:275
+    """
+    return {
+        'v': g[G.EL],       # Initialize at resting potential
+        'i_asc_0': 0.0,     # After-spike current 0 starts at zero
+        'i_asc_1': 0.0,     # After-spike current 1 starts at zero
     }
 
 def create_V1(glif3s, ps2g, v1_synapses):
@@ -776,6 +792,7 @@ def create_V1(glif3s, ps2g, v1_synapses):
             len(gids),
             GLIF3Curr,
             cellparams=G2D(glif3s[pid]),
+            initial_values=G2IV(glif3s[pid]),
             neurons_per_core=int(np.min([200, ( 1 / size ) * 1e6])),
             label=f'V1_{pid}_{subpid}'
         )
