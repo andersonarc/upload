@@ -7,6 +7,7 @@
 
 #include <neuron/synapse_types/exp_synapse_utils.h>
 #include <debug.h>
+#include <stddef.h>
 
 #define SYNAPSE_TYPE_BITS 2
 #define SYNAPSE_TYPE_COUNT 4
@@ -62,13 +63,14 @@ static inline void synapse_types_shape_input(synapse_types_t *p) {
     exp_shaping(&p->syn_3_rise);
 }
 
-static void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_t input) {
-    switch(i) {
-        case 0: add_input_exp(&p->syn_0_rise, input); break;
-        case 1: add_input_exp(&p->syn_1_rise, input); break;
-        case 2: add_input_exp(&p->syn_2_rise, input); break;
-        case 3: add_input_exp(&p->syn_3_rise, input); break;
-    }
+static inline void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_t input) {
+    static const size_t offsets[4] = {
+        offsetof(synapse_types_t, syn_0_rise),
+        offsetof(synapse_types_t, syn_1_rise),
+        offsetof(synapse_types_t, syn_2_rise),
+        offsetof(synapse_types_t, syn_3_rise)
+    };
+    add_input_exp((exp_state_t*)((char*)p + offsets[i]), input);
 }
 
 static inline input_t* synapse_types_get_excitatory_input(input_t *e, synapse_types_t *p) {
