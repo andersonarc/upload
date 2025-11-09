@@ -160,12 +160,28 @@ class GLIF3SynapseType(AbstractSynapseType):
 
     # Property getters and setters for isyn state variables
     @property
+    def isyn_0_rise(self):
+        return self._isyn_0_rise
+
+    @isyn_0_rise.setter
+    def isyn_0_rise(self, isyn_0_rise):
+        self._isyn_0_rise = isyn_0_rise
+
+    @property
     def isyn_0(self):
         return self._isyn_0
 
     @isyn_0.setter
     def isyn_0(self, isyn_0):
         self._isyn_0 = isyn_0
+
+    @property
+    def isyn_1_rise(self):
+        return self._isyn_1_rise
+
+    @isyn_1_rise.setter
+    def isyn_1_rise(self, isyn_1_rise):
+        self._isyn_1_rise = isyn_1_rise
 
     @property
     def isyn_1(self):
@@ -176,12 +192,28 @@ class GLIF3SynapseType(AbstractSynapseType):
         self._isyn_1 = isyn_1
 
     @property
+    def isyn_2_rise(self):
+        return self._isyn_2_rise
+
+    @isyn_2_rise.setter
+    def isyn_2_rise(self, isyn_2_rise):
+        self._isyn_2_rise = isyn_2_rise
+
+    @property
     def isyn_2(self):
         return self._isyn_2
 
     @isyn_2.setter
     def isyn_2(self, isyn_2):
         self._isyn_2 = isyn_2
+
+    @property
+    def isyn_3_rise(self):
+        return self._isyn_3_rise
+
+    @isyn_3_rise.setter
+    def isyn_3_rise(self, isyn_3_rise):
+        self._isyn_3_rise = isyn_3_rise
 
     @property
     def isyn_3(self):
