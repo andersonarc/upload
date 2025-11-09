@@ -82,20 +82,9 @@ static void synapse_types_add_neuron_input(
         index_t synapse_type_index, synapse_types_t *parameters,
         input_t input) {
     // Add input to rise variable (alpha synapse first stage)
-    switch (synapse_type_index) {
-        case SYNAPSE_0:
-            add_input_exp(&parameters->syn_0_rise, input);
-            break;
-        case SYNAPSE_1:
-            add_input_exp(&parameters->syn_1_rise, input);
-            break;
-        case SYNAPSE_2:
-            add_input_exp(&parameters->syn_2_rise, input);
-            break;
-        case SYNAPSE_3:
-            add_input_exp(&parameters->syn_3_rise, input);
-            break;
-    }
+    exp_state_t *rise[] = {&parameters->syn_0_rise, &parameters->syn_1_rise,
+                           &parameters->syn_2_rise, &parameters->syn_3_rise};
+    add_input_exp(rise[synapse_type_index], input);
 }
 
 static input_t* synapse_types_get_excitatory_input(
@@ -115,15 +104,18 @@ static input_t* synapse_types_get_inhibitory_input(
     return NULL;
 }
 
+__attribute__((unused))
 static const char *synapse_types_get_type_char(index_t synapse_type_index) {
     use(synapse_type_index);
     return "";
 }
 
+__attribute__((unused))
 static void synapse_types_print_input(synapse_types_t *parameters) {
     use(parameters);
 }
 
+__attribute__((unused))
 static void synapse_types_print_parameters(synapse_types_t *parameters) {
     use(parameters);
 }
