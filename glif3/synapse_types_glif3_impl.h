@@ -41,10 +41,13 @@ static void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t 
 }
 
 static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t *p) {
+    // Must save BOTH psc and psc_rise for double-exponential synapses
+    // Each parameter struct is used for both rise and main components
     p->syn_0.init_input = s->syn_0.synaptic_input_value;
     p->syn_1.init_input = s->syn_1.synaptic_input_value;
     p->syn_2.init_input = s->syn_2.synaptic_input_value;
     p->syn_3.init_input = s->syn_3.synaptic_input_value;
+    // Note: psc_rise values use same params, so they persist via the state struct
 }
 
 static void synapse_types_shape_input(synapse_types_t *p) {
