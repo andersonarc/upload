@@ -49,7 +49,7 @@ typedef enum input_buffer_regions {
     decay_and_init(&state->syn, &params->syn, params->time_step_ms, n_steps_per_timestep); \
 } while(0)
 
-static inline void synapse_types_initialise(synapse_types_t *state,
+static void synapse_types_initialise(synapse_types_t *state,
         synapse_types_params_t *params, uint32_t n_steps_per_timestep) {
     ALPHA_INIT(state, params, syn_0);
     ALPHA_INIT(state, params, syn_1);
@@ -57,7 +57,7 @@ static inline void synapse_types_initialise(synapse_types_t *state,
     ALPHA_INIT(state, params, syn_3);
 }
 
-static inline void synapse_types_save_state(synapse_types_t *state,
+static void synapse_types_save_state(synapse_types_t *state,
         synapse_types_params_t *params) {
     params->syn_0.init_input = state->syn_0.synaptic_input_value;
     params->syn_1.init_input = state->syn_1.synaptic_input_value;
@@ -71,14 +71,14 @@ static inline void synapse_types_save_state(synapse_types_t *state,
                                    decay_s1615(p->syn##_rise.synaptic_input_value, p->syn.decay); \
 } while(0)
 
-static inline void synapse_types_shape_input(synapse_types_t *p) {
+static void synapse_types_shape_input(synapse_types_t *p) {
     ALPHA_SHAPE(syn_0);
     ALPHA_SHAPE(syn_1);
     ALPHA_SHAPE(syn_2);
     ALPHA_SHAPE(syn_3);
 }
 
-static inline void synapse_types_add_neuron_input(
+static void synapse_types_add_neuron_input(
         index_t synapse_type_index, synapse_types_t *parameters,
         input_t input) {
     // Add input to rise variable (alpha synapse first stage)
@@ -98,7 +98,7 @@ static inline void synapse_types_add_neuron_input(
     }
 }
 
-static inline input_t* synapse_types_get_excitatory_input(
+static input_t* synapse_types_get_excitatory_input(
         input_t *excitatory_response, synapse_types_t *parameters) {
     // Return current values (I_syn), not rise values
     excitatory_response[0] = parameters->syn_0.synaptic_input_value;
@@ -108,23 +108,23 @@ static inline input_t* synapse_types_get_excitatory_input(
     return &excitatory_response[0];
 }
 
-static inline input_t* synapse_types_get_inhibitory_input(
+static input_t* synapse_types_get_inhibitory_input(
         input_t *inhibitory_response, synapse_types_t *parameters) {
     use(inhibitory_response);
     use(parameters);
     return NULL;
 }
 
-static inline const char *synapse_types_get_type_char(index_t synapse_type_index) {
+static const char *synapse_types_get_type_char(index_t synapse_type_index) {
     use(synapse_type_index);
-    return "0";
+    return "";
 }
 
-static inline void synapse_types_print_input(synapse_types_t *parameters) {
+static void synapse_types_print_input(synapse_types_t *parameters) {
     use(parameters);
 }
 
-static inline void synapse_types_print_parameters(synapse_types_t *parameters) {
+static void synapse_types_print_parameters(synapse_types_t *parameters) {
     use(parameters);
 }
 
