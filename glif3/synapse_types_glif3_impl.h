@@ -26,12 +26,16 @@ struct synapse_types_params_t {
     REAL time_step_ms;
 };
 
-// State for 4 independent exponential synapses
+// State for 4 independent alpha synapses (doubled state for rise + current)
 struct synapse_types_t {
-    exp_state_t syn_0;  // tau_syn0
-    exp_state_t syn_1;  // tau_syn1
-    exp_state_t syn_2;  // tau_syn2
-    exp_state_t syn_3;  // tau_syn3
+    exp_state_t syn_0_rise;
+    exp_state_t syn_0;
+    exp_state_t syn_1_rise;
+    exp_state_t syn_1;
+    exp_state_t syn_2_rise;
+    exp_state_t syn_2;
+    exp_state_t syn_3_rise;
+    exp_state_t syn_3;
 };
 
 // All 4 receptors are excitatory (can be made inhibitory by connection weight sign)
@@ -48,6 +52,17 @@ typedef enum input_buffer_regions {
 
 static inline void synapse_types_initialise(synapse_types_t *state,
         synapse_types_params_t *params, uint32_t n_steps_per_timestep) {
+    // Initialize rise variables to 0
+    decay_and_init(&state->syn_0_rise, &params->syn_0, params->time_step_ms, n_steps_per_timestep);
+    state->syn_0_rise.synaptic_input_value = 0.0k;
+    decay_and_init(&state->syn_1_rise, &params->syn_1, params->time_step_ms, n_steps_per_timestep);
+    state->syn_1_rise.synaptic_input_value = 0.0k;
+    decay_and_init(&state->syn_2_rise, &params->syn_2, params->time_step_ms, n_steps_per_timestep);
+    state->syn_2_rise.synaptic_input_value = 0.0k;
+    decay_and_init(&state->syn_3_rise, &params->syn_3, params->time_step_ms, n_steps_per_timestep);
+    state->syn_3_rise.synaptic_input_value = 0.0k;
+
+    // Initialize current variables from params
     decay_and_init(&state->syn_0, &params->syn_0, params->time_step_ms, n_steps_per_timestep);
     decay_and_init(&state->syn_1, &params->syn_1, params->time_step_ms, n_steps_per_timestep);
     decay_and_init(&state->syn_2, &params->syn_2, params->time_step_ms, n_steps_per_timestep);
@@ -62,30 +77,42 @@ static inline void synapse_types_save_state(synapse_types_t *state,
     params->syn_3.init_input = state->syn_3.synaptic_input_value;
 }
 
-//! \brief Shapes the synaptic input (exponential decay)
-static inline void synapse_types_shape_input(synapse_types_t *parameters) {
-    exp_shaping(&parameters->syn_0);
-    exp_shaping(&parameters->syn_1);
-    exp_shaping(&parameters->syn_2);
-    exp_shaping(&parameters->syn_3);
+//! \brief Shapes the synaptic input (alpha synapse dynamics)
+static inline void synapse_types_shape_input(synapse_types_t *p) {
+    // Alpha synapse: Update current using OLD rise, then update rise
+    p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
+                                     decay_s1615(p->syn_0_rise.synaptic_input_value, p->syn_0.decay);
+    exp_shaping(&p->syn_0_rise);
+
+    p->syn_1.synaptic_input_value = decay_s1615(p->syn_1.synaptic_input_value, p->syn_1.decay) +
+                                     decay_s1615(p->syn_1_rise.synaptic_input_value, p->syn_1.decay);
+    exp_shaping(&p->syn_1_rise);
+
+    p->syn_2.synaptic_input_value = decay_s1615(p->syn_2.synaptic_input_value, p->syn_2.decay) +
+                                     decay_s1615(p->syn_2_rise.synaptic_input_value, p->syn_2.decay);
+    exp_shaping(&p->syn_2_rise);
+
+    p->syn_3.synaptic_input_value = decay_s1615(p->syn_3.synaptic_input_value, p->syn_3.decay) +
+                                     decay_s1615(p->syn_3_rise.synaptic_input_value, p->syn_3.decay);
+    exp_shaping(&p->syn_3_rise);
 }
 
-//! \brief Adds input to the appropriate synapse type
+//! \brief Adds input to the appropriate synapse type (rise variable for alpha)
 static inline void synapse_types_add_neuron_input(
         index_t synapse_type_index, synapse_types_t *parameters,
         input_t input) {
     switch (synapse_type_index) {
         case SYNAPSE_0:
-            add_input_exp(&parameters->syn_0, input);
+            add_input_exp(&parameters->syn_0_rise, input);
             break;
         case SYNAPSE_1:
-            add_input_exp(&parameters->syn_1, input);
+            add_input_exp(&parameters->syn_1_rise, input);
             break;
         case SYNAPSE_2:
-            add_input_exp(&parameters->syn_2, input);
+            add_input_exp(&parameters->syn_2_rise, input);
             break;
         case SYNAPSE_3:
-            add_input_exp(&parameters->syn_3, input);
+            add_input_exp(&parameters->syn_3_rise, input);
             break;
         default:
             log_error("Invalid synapse type index: %d", synapse_type_index);
