@@ -29,7 +29,7 @@ typedef enum input_buffer_regions {
     SYNAPSE_0, SYNAPSE_1, SYNAPSE_2, SYNAPSE_3
 } input_buffer_regions;
 
-static void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t *p, uint32_t n) {
+static inline void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t *p, uint32_t n) {
     decay_and_init(&s->syn_0_rise, &p->syn_0, p->time_step_ms, n); s->syn_0_rise.synaptic_input_value = 0.0k;
     decay_and_init(&s->syn_0, &p->syn_0, p->time_step_ms, n);
     decay_and_init(&s->syn_1_rise, &p->syn_1, p->time_step_ms, n); s->syn_1_rise.synaptic_input_value = 0.0k;
@@ -40,14 +40,14 @@ static void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t 
     decay_and_init(&s->syn_3, &p->syn_3, p->time_step_ms, n);
 }
 
-static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t *p) {
+static inline void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t *p) {
     p->syn_0.init_input = s->syn_0.synaptic_input_value;
     p->syn_1.init_input = s->syn_1.synaptic_input_value;
     p->syn_2.init_input = s->syn_2.synaptic_input_value;
     p->syn_3.init_input = s->syn_3.synaptic_input_value;
 }
 
-static void synapse_types_shape_input(synapse_types_t *p) {
+static inline void synapse_types_shape_input(synapse_types_t *p) {
     p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
                                      decay_s1615(p->syn_0_rise.synaptic_input_value, p->syn_0.decay);
     exp_shaping(&p->syn_0_rise);
@@ -71,7 +71,7 @@ static void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_
     }
 }
 
-static input_t* synapse_types_get_excitatory_input(input_t *e, synapse_types_t *p) {
+static inline input_t* synapse_types_get_excitatory_input(input_t *e, synapse_types_t *p) {
     e[0] = p->syn_0.synaptic_input_value;
     e[1] = p->syn_1.synaptic_input_value;
     e[2] = p->syn_2.synaptic_input_value;
@@ -79,7 +79,7 @@ static input_t* synapse_types_get_excitatory_input(input_t *e, synapse_types_t *
     return e;
 }
 
-static input_t* synapse_types_get_inhibitory_input(input_t *i, synapse_types_t *p) {
+static inline input_t* synapse_types_get_inhibitory_input(input_t *i, synapse_types_t *p) {
     use(i); use(p); return NULL;
 }
 
