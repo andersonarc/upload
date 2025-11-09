@@ -12,7 +12,7 @@
 #define SYNAPSE_TYPE_COUNT 4
 
 struct synapse_types_params_t {
-    exp_params_t syn_0, syn_1, syn_2, syn_3;
+    exp_params_t syn_0_rise, syn_0, syn_1_rise, syn_1, syn_2_rise, syn_2, syn_3_rise, syn_3;
     REAL time_step_ms;
 };
 
@@ -30,24 +30,26 @@ typedef enum input_buffer_regions {
 } input_buffer_regions;
 
 static void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t *p, uint32_t n) {
-    decay_and_init(&s->syn_0_rise, &p->syn_0, p->time_step_ms, n); s->syn_0_rise.synaptic_input_value = 0.0k;
+    decay_and_init(&s->syn_0_rise, &p->syn_0_rise, p->time_step_ms, n);
     decay_and_init(&s->syn_0, &p->syn_0, p->time_step_ms, n);
-    decay_and_init(&s->syn_1_rise, &p->syn_1, p->time_step_ms, n); s->syn_1_rise.synaptic_input_value = 0.0k;
+    decay_and_init(&s->syn_1_rise, &p->syn_1_rise, p->time_step_ms, n);
     decay_and_init(&s->syn_1, &p->syn_1, p->time_step_ms, n);
-    decay_and_init(&s->syn_2_rise, &p->syn_2, p->time_step_ms, n); s->syn_2_rise.synaptic_input_value = 0.0k;
+    decay_and_init(&s->syn_2_rise, &p->syn_2_rise, p->time_step_ms, n);
     decay_and_init(&s->syn_2, &p->syn_2, p->time_step_ms, n);
-    decay_and_init(&s->syn_3_rise, &p->syn_3, p->time_step_ms, n); s->syn_3_rise.synaptic_input_value = 0.0k;
+    decay_and_init(&s->syn_3_rise, &p->syn_3_rise, p->time_step_ms, n);
     decay_and_init(&s->syn_3, &p->syn_3, p->time_step_ms, n);
 }
 
 static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t *p) {
-    // Must save BOTH psc and psc_rise for double-exponential synapses
-    // Each parameter struct is used for both rise and main components
+    // Save all 8 state values (psc_rise and psc for each of 4 receptors)
+    p->syn_0_rise.init_input = s->syn_0_rise.synaptic_input_value;
     p->syn_0.init_input = s->syn_0.synaptic_input_value;
+    p->syn_1_rise.init_input = s->syn_1_rise.synaptic_input_value;
     p->syn_1.init_input = s->syn_1.synaptic_input_value;
+    p->syn_2_rise.init_input = s->syn_2_rise.synaptic_input_value;
     p->syn_2.init_input = s->syn_2.synaptic_input_value;
+    p->syn_3_rise.init_input = s->syn_3_rise.synaptic_input_value;
     p->syn_3.init_input = s->syn_3.synaptic_input_value;
-    // Note: psc_rise values use same params, so they persist via the state struct
 }
 
 static void synapse_types_shape_input(synapse_types_t *p) {
