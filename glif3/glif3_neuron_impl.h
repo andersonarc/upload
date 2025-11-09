@@ -72,7 +72,7 @@ struct neuron_t {
     uint32_t refract_steps;   // Total refractory period (in time steps)
 };
 
-static inline void neuron_model_initialise(neuron_t *state, neuron_params_t *params,
+static void neuron_model_initialise(neuron_t *state, neuron_params_t *params,
         uint32_t n_steps_per_timestep) {
 
     // Initialize state variables
@@ -173,25 +173,14 @@ static void neuron_model_has_spiked(neuron_t *restrict neuron) {
     neuron->refract_timer = neuron->refract_steps;
 }
 
-static inline void neuron_model_print_state_variables(const neuron_t *neuron) {
-    log_info("V = %11.4k mV", neuron->V);
-    log_info("I_asc_0 = %11.4k nA", neuron->I_asc_0);
-    log_info("I_asc_1 = %11.4k nA", neuron->I_asc_1);
-    log_info("Refract timer = %u", neuron->refract_timer);
+__attribute__((unused))
+static void neuron_model_print_state_variables(const neuron_t *neuron) {
+    use(neuron);
 }
 
-static inline void neuron_model_print_parameters(const neuron_t *neuron) {
-    log_info("C_m = %11.4k nF", neuron->C_m);
-    log_info("E_L = %11.4k mV", neuron->E_L);
-    log_info("V_reset = %11.4k mV", neuron->V_reset);
-    log_info("V_thresh = %11.4k mV", neuron->V_thresh);
-    log_info("asc_amp_0 = %11.4k nA", neuron->asc_amp_0);
-    log_info("asc_amp_1 = %11.4k nA", neuron->asc_amp_1);
-    log_info("g = %11.4k uS", neuron->g);
-    log_info("k0 = %11.4k 1/ms", neuron->k0);
-    log_info("k1 = %11.4k 1/ms", neuron->k1);
-    log_info("t_ref = %11.4k ms", neuron->t_ref);
-    log_info("I_offset = %11.4k nA", neuron->I_offset);
+__attribute__((unused))
+static void neuron_model_print_parameters(const neuron_t *neuron) {
+    use(neuron);
 }
 
 #endif // _NEURON_MODEL_GLIF3_IMPL_H_
