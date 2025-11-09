@@ -19,14 +19,10 @@ TIMESTEP_MS = 'timestep_ms'
 
 class GLIF3SynapseType(AbstractSynapseType):
     """
-    Synapse type for GLIF3 model with 4 independent alpha (double-exponential) synapses.
+    Synapse type for GLIF3 model with 4 independent exponential synapses.
 
-    This implements the synapse dynamics from Chen et al. (2022) Equation 3:
-      C_rise(t+dt) = exp(-dt/tau) * C_rise(t) + (e/tau) * weight * spike
-      I_syn(t+dt) = exp(-dt/tau) * I_syn(t) + dt * exp(-dt/tau) * C_rise(t)
-
-    Each synapse has a rise phase followed by exponential decay, providing more
-    realistic temporal dynamics than simple exponential synapses.
+    This allows for 4 different receptor types, each with its own time constant.
+    All synapses use exponential decay.
 
     Receptor Types (Allen Institute convention):
     - Type 0 (AMPA): Fast excitatory
@@ -52,12 +48,6 @@ class GLIF3SynapseType(AbstractSynapseType):
         Initial current for synapse 2 (nA). Default: 0.0
     isyn_3 : float
         Initial current for synapse 3 (nA). Default: 0.0
-
-    Notes
-    -----
-    The C implementation maintains both rise (C_rise) and current (I_syn) state
-    variables for each synapse (8 total). Only current values (4) are declared
-    as state variables in Python; rise values always initialize to 0 in C code.
     """
 
     def __init__(
@@ -71,9 +61,9 @@ class GLIF3SynapseType(AbstractSynapseType):
             isyn_2=0.0,
             isyn_3=0.0):
 
-        # Define the struct layout - must match C synapse_types_params_t exactly
-        # Parameters: 4 tau values + 4 init_input values (for current only)
-        # State: Only 4 current values declared; rise always starts at 0
+        # Define the struct layout - must match C implementation exactly
+        # Each synapse has: tau (decay), init_input (initial current)
+        # Plus timestep_ms for all synapses
         super().__init__(
             [Struct([
                 (DataType.S1615, TAU_SYN_0),
@@ -98,7 +88,7 @@ class GLIF3SynapseType(AbstractSynapseType):
         self._tau_syn_2 = tau_syn_2
         self._tau_syn_3 = tau_syn_3
 
-        # Store state variables (current values only)
+        # Store state variables
         self._isyn_0 = isyn_0
         self._isyn_1 = isyn_1
         self._isyn_2 = isyn_2
@@ -218,9 +208,7 @@ class GLIF3SynapseType(AbstractSynapseType):
             SpynnakerDataView.get_simulation_time_step_ms())
 
     def add_state_variables(self, state_variables):
-        # Only declare current values (4), not rise values
-        # Rise always starts at 0 (enforced in C initialization)
-        # These map to params->syn_X.init_input (4 slots in params struct)
+        # Add state variables (initial synaptic currents)
         state_variables[ISYN_0] = self._isyn_0
         state_variables[ISYN_1] = self._isyn_1
         state_variables[ISYN_2] = self._isyn_2
