@@ -107,26 +107,40 @@ The alpha synapse implementation doubled state variables (8 instead of 4), initi
    - Made all `synapse_types_print_*` functions no-ops
    - Simplified `synapse_types_get_type_char` to return constant
 
-4. **Array-based refactor** (commit 8e07ffd): **Current version**
+4. **Array-based refactor** (commit 8e07ffd): ❌ **Caused runtime crashes**
    - Changed to `rise[4]` and `curr[4]` arrays
    - Used for-loops instead of macros
-   - Most compact representation possible while maintaining correctness
+   - **PROBLEM**: Array layout incompatible with SpiNNaker memory allocator
+   - Compilation succeeded but caused DMA tag errors and allocation failures at runtime
+   - Error: "Cannot handle tag value", "Cannot allocate DMA transfer callback", etc.
+
+5. **Individual field layout** (commit 4b2dbbc): ✅ **Current working version**
+   - Reverted to individual fields: `syn_0_rise, syn_0, syn_1_rise, syn_1, ...`
+   - Direct field access instead of loops
+   - Matches SpiNNaker's expected memory layout and Python wrapper
+   - Preserves alpha synapse dynamics while fixing runtime errors
 
 ### Final Implementation
 
 ```c
 struct synapse_types_t {
-    exp_state_t rise[4];  // C_rise for each synapse
-    exp_state_t curr[4];  // I_syn for each synapse
+    exp_state_t syn_0_rise;  // C_rise for synapse 0
+    exp_state_t syn_0;       // I_syn for synapse 0
+    exp_state_t syn_1_rise;
+    exp_state_t syn_1;
+    exp_state_t syn_2_rise;
+    exp_state_t syn_2;
+    exp_state_t syn_3_rise;
+    exp_state_t syn_3;
 };
 
 static inline void synapse_types_shape_input(synapse_types_t *p) {
-    for (uint32_t i = 0; i < 4; i++) {
-        exp_shaping(&p->rise[i]);
-        p->curr[i].synaptic_input_value =
-            decay_s1615(p->curr[i].synaptic_input_value, p->curr[i].decay) +
-            decay_s1615(p->rise[i].synaptic_input_value, p->curr[i].decay);
-    }
+    // Alpha synapse dynamics for synapse 0
+    exp_shaping(&p->syn_0_rise);
+    p->syn_0.synaptic_input_value =
+        decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
+        decay_s1615(p->syn_0_rise.synaptic_input_value, p->syn_0.decay);
+    // ... (repeated for syn_1, syn_2, syn_3)
 }
 ```
 
