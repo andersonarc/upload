@@ -7,6 +7,7 @@
 
 #include <neuron/synapse_types/exp_synapse_utils.h>
 #include <debug.h>
+#include <stddef.h>
 
 #define SYNAPSE_TYPE_BITS 2
 #define SYNAPSE_TYPE_COUNT 4
@@ -28,6 +29,14 @@ struct synapse_types_t {
 typedef enum input_buffer_regions {
     SYNAPSE_0, SYNAPSE_1, SYNAPSE_2, SYNAPSE_3
 } input_buffer_regions;
+
+// Use uint8_t to save space - offsets are small
+static const uint8_t rise_offsets[4] = {
+    offsetof(synapse_types_t, syn_0_rise),
+    offsetof(synapse_types_t, syn_1_rise),
+    offsetof(synapse_types_t, syn_2_rise),
+    offsetof(synapse_types_t, syn_3_rise)
+};
 
 static inline void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t *p, uint32_t n) {
     decay_and_init(&s->syn_0_rise, &p->syn_0, p->time_step_ms, n); s->syn_0_rise.synaptic_input_value = 0.0k;
@@ -62,11 +71,8 @@ static void synapse_types_shape_input(synapse_types_t *p) {
     exp_shaping(&p->syn_3_rise);
 }
 
-static inline void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_t input) {
-    if (i == 0) add_input_exp(&p->syn_0_rise, input);
-    else if (i == 1) add_input_exp(&p->syn_1_rise, input);
-    else if (i == 2) add_input_exp(&p->syn_2_rise, input);
-    else add_input_exp(&p->syn_3_rise, input);
+static void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_t input) {
+    add_input_exp((exp_state_t*)((uint8_t*)p + rise_offsets[i]), input);
 }
 
 static inline input_t* synapse_types_get_excitatory_input(input_t *e, synapse_types_t *p) {
