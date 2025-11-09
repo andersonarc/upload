@@ -6,9 +6,13 @@ from spynnaker.pyNN.utilities.struct import Struct
 from spynnaker.pyNN.data.spynnaker_data_view import SpynnakerDataView
 
 # Parameter and state variable names
+TAU_SYN_0_RISE = 'tau_syn_0_rise'
 TAU_SYN_0 = 'tau_syn_0'
+TAU_SYN_1_RISE = 'tau_syn_1_rise'
 TAU_SYN_1 = 'tau_syn_1'
+TAU_SYN_2_RISE = 'tau_syn_2_rise'
 TAU_SYN_2 = 'tau_syn_2'
+TAU_SYN_3_RISE = 'tau_syn_3_rise'
 TAU_SYN_3 = 'tau_syn_3'
 ISYN_0_RISE = 'isyn_0_rise'
 ISYN_0 = 'isyn_0'
@@ -71,26 +75,28 @@ class GLIF3SynapseType(AbstractSynapseType):
         # For alpha synapses, rise and main share the same tau value
         super().__init__(
             [Struct([
-                (DataType.S1615, TAU_SYN_0),      # syn_0_rise.tau
+                (DataType.S1615, TAU_SYN_0_RISE), # syn_0_rise.tau
                 (DataType.S1615, ISYN_0_RISE),    # syn_0_rise.init_input
-                (DataType.S1615, TAU_SYN_0),      # syn_0.tau (same as rise)
+                (DataType.S1615, TAU_SYN_0),      # syn_0.tau
                 (DataType.S1615, ISYN_0),         # syn_0.init_input
-                (DataType.S1615, TAU_SYN_1),      # syn_1_rise.tau
+                (DataType.S1615, TAU_SYN_1_RISE), # syn_1_rise.tau
                 (DataType.S1615, ISYN_1_RISE),    # syn_1_rise.init_input
                 (DataType.S1615, TAU_SYN_1),      # syn_1.tau
                 (DataType.S1615, ISYN_1),         # syn_1.init_input
-                (DataType.S1615, TAU_SYN_2),      # syn_2_rise.tau
+                (DataType.S1615, TAU_SYN_2_RISE), # syn_2_rise.tau
                 (DataType.S1615, ISYN_2_RISE),    # syn_2_rise.init_input
                 (DataType.S1615, TAU_SYN_2),      # syn_2.tau
                 (DataType.S1615, ISYN_2),         # syn_2.init_input
-                (DataType.S1615, TAU_SYN_3),      # syn_3_rise.tau
+                (DataType.S1615, TAU_SYN_3_RISE), # syn_3_rise.tau
                 (DataType.S1615, ISYN_3_RISE),    # syn_3_rise.init_input
                 (DataType.S1615, TAU_SYN_3),      # syn_3.tau
                 (DataType.S1615, ISYN_3),         # syn_3.init_input
                 (DataType.S1615, TIMESTEP_MS)])],
             {
-                TAU_SYN_0: "ms", TAU_SYN_1: "ms",
-                TAU_SYN_2: "ms", TAU_SYN_3: "ms",
+                TAU_SYN_0_RISE: "ms", TAU_SYN_0: "ms",
+                TAU_SYN_1_RISE: "ms", TAU_SYN_1: "ms",
+                TAU_SYN_2_RISE: "ms", TAU_SYN_2: "ms",
+                TAU_SYN_3_RISE: "ms", TAU_SYN_3: "ms",
                 ISYN_0_RISE: "nA", ISYN_0: "nA",
                 ISYN_1_RISE: "nA", ISYN_1: "nA",
                 ISYN_2_RISE: "nA", ISYN_2: "nA",
@@ -215,9 +221,14 @@ class GLIF3SynapseType(AbstractSynapseType):
 
     def add_parameters(self, parameters):
         # Add parameters (time constants)
+        # For alpha synapses, rise and main use the same tau
+        parameters[TAU_SYN_0_RISE] = self._tau_syn_0
         parameters[TAU_SYN_0] = self._tau_syn_0
+        parameters[TAU_SYN_1_RISE] = self._tau_syn_1
         parameters[TAU_SYN_1] = self._tau_syn_1
+        parameters[TAU_SYN_2_RISE] = self._tau_syn_2
         parameters[TAU_SYN_2] = self._tau_syn_2
+        parameters[TAU_SYN_3_RISE] = self._tau_syn_3
         parameters[TAU_SYN_3] = self._tau_syn_3
         parameters[TIMESTEP_MS] = (
             SpynnakerDataView.get_simulation_time_step_ms())
