@@ -25,6 +25,7 @@ struct synapse_types_params_t {
 
 struct synapse_types_t {
     exp_state_t syn_0_rise, syn_0, syn_1_rise, syn_1, syn_2_rise, syn_2, syn_3_rise, syn_3;
+    REAL dt;  // Timestep in ms (needed for TensorFlow line 319 compatibility)
 };
 
 #define NUM_EXCITATORY_RECEPTORS 4
@@ -42,9 +43,12 @@ static inline void init_double_exp(exp_state_t *rise, exp_state_t *main,
     REAL ts = kdivui(dt, n);
     REAL ts_over_tau = kdivk(ts, params->tau);
     decay_t decay = expulr(-ts_over_tau);
-    decay_t inv_decay = 1.0ulr - decay;
-    REAL tau_over_ts = kdivk(params->tau, ts);
-    decay_t init = decay_s1615_to_u032(tau_over_ts, inv_decay);
+
+    // CRITICAL: TensorFlow uses psc_initial = e / tau (line 174)
+    // NOT the standard exponential synapse normalization tau * (1 - exp(-dt/tau))
+    // e ≈ 2.71828, using expulr(1.0) to get e in fixed-point
+    REAL e_approx = expulr(ONE);  // exp(1) = e
+    decay_t init = kdivk(e_approx, params->tau);  // e / tau (matches TensorFlow)
 
     // Both rise and main share same decay and init constants
     rise->decay = decay;
@@ -61,6 +65,9 @@ static void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t 
     init_double_exp(&s->syn_1_rise, &s->syn_1, &p->syn_1, p->time_step_ms, n);
     init_double_exp(&s->syn_2_rise, &s->syn_2, &p->syn_2, p->time_step_ms, n);
     init_double_exp(&s->syn_3_rise, &s->syn_3, &p->syn_3, p->time_step_ms, n);
+
+    // Store dt for use in shape_input (TensorFlow line 319 compatibility)
+    s->dt = p->time_step_ms;
 }
 
 static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t *p) {
@@ -78,20 +85,23 @@ static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t 
 static void synapse_types_shape_input(synapse_types_t *p) {
     // Match TensorFlow line 319: new_psc = psc * decay + dt * decay * OLD_psc_rise
     // Use OLD psc_rise (before decay), then decay it after
+    // NOTE: dt factor is critical! TensorFlow includes this (line 319)
+    REAL dt = p->dt;
+
     p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
-                                     decay_s1615(p->syn_0_rise.synaptic_input_value, p->syn_0.decay);
+                                     decay_s1615(dt * p->syn_0_rise.synaptic_input_value, p->syn_0.decay);
     exp_shaping(&p->syn_0_rise);
 
     p->syn_1.synaptic_input_value = decay_s1615(p->syn_1.synaptic_input_value, p->syn_1.decay) +
-                                     decay_s1615(p->syn_1_rise.synaptic_input_value, p->syn_1.decay);
+                                     decay_s1615(dt * p->syn_1_rise.synaptic_input_value, p->syn_1.decay);
     exp_shaping(&p->syn_1_rise);
 
     p->syn_2.synaptic_input_value = decay_s1615(p->syn_2.synaptic_input_value, p->syn_2.decay) +
-                                     decay_s1615(p->syn_2_rise.synaptic_input_value, p->syn_2.decay);
+                                     decay_s1615(dt * p->syn_2_rise.synaptic_input_value, p->syn_2.decay);
     exp_shaping(&p->syn_2_rise);
 
     p->syn_3.synaptic_input_value = decay_s1615(p->syn_3.synaptic_input_value, p->syn_3.decay) +
-                                     decay_s1615(p->syn_3_rise.synaptic_input_value, p->syn_3.decay);
+                                     decay_s1615(dt * p->syn_3_rise.synaptic_input_value, p->syn_3.decay);
     exp_shaping(&p->syn_3_rise);
 }
 
