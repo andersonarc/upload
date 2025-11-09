@@ -45,8 +45,8 @@ typedef enum input_buffer_regions {
 
 #define ALPHA_INIT(state, params, syn) do { \
     decay_and_init(&state->syn##_rise, &params->syn, params->time_step_ms, n_steps_per_timestep); \
+    state->syn##_rise.synaptic_input_value = 0.0k; \
     decay_and_init(&state->syn, &params->syn, params->time_step_ms, n_steps_per_timestep); \
-    state->syn.synaptic_input_value = params->syn.init_input; \
 } while(0)
 
 __attribute__((optimize("Os")))
