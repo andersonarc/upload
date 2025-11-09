@@ -63,8 +63,12 @@ static void synapse_types_shape_input(synapse_types_t *p) {
 }
 
 static void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_t input) {
-    exp_state_t *r[] = {&p->syn_0_rise, &p->syn_1_rise, &p->syn_2_rise, &p->syn_3_rise};
-    add_input_exp(r[i], input);
+    switch(i) {
+        case 0: add_input_exp(&p->syn_0_rise, input); break;
+        case 1: add_input_exp(&p->syn_1_rise, input); break;
+        case 2: add_input_exp(&p->syn_2_rise, input); break;
+        case 3: add_input_exp(&p->syn_3_rise, input); break;
+    }
 }
 
 static input_t* synapse_types_get_excitatory_input(input_t *e, synapse_types_t *p) {
