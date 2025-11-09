@@ -70,6 +70,10 @@ struct neuron_t {
     // Exponential Euler integration (matches TensorFlow)
     REAL v_decay;             // exp(-dt * g / C_m)
     REAL current_factor;      // (1 - v_decay) / g
+    REAL reset_current;       // (V_reset - V_thresh) for soft reset
+
+    // Spike tracking for TensorFlow-style reset
+    uint32_t spiked_last_step; // 1 if spike occurred in previous timestep, 0 otherwise
 
     // Refractory period tracking
     uint32_t refract_timer;   // Refractory period timer (in time steps)
@@ -114,6 +118,11 @@ static inline void neuron_model_initialise(neuron_t *state, neuron_params_t *par
     state->v_decay = expk(-dt / tau);
     // current_factor = (1/C_m) * (1 - decay) * tau = (1 - decay) / g
     state->current_factor = (ONE - state->v_decay) / state->g;
+    // reset_current = (V_reset - V_thresh) applied when spike occurs (TensorFlow line 328)
+    state->reset_current = state->V_reset - state->V_thresh;
+
+    // Initialize spike tracking
+    state->spiked_last_step = 0;
 
     // Calculate refractory period in time steps
     state->refract_steps = (uint32_t) (state->t_ref * n_steps_per_timestep);
@@ -132,12 +141,6 @@ static state_t neuron_model_state_update(
         uint16_t num_inhibitory_inputs, const input_t* inh_input,
         input_t external_bias, REAL current_offset, neuron_t *restrict neuron) {
 
-    // If in refractory period, just decrement timer and return current voltage
-    if (neuron->refract_timer > 0) {
-        neuron->refract_timer--;
-        return neuron->V;
-    }
-
     // Sum excitatory and inhibitory inputs
     REAL total_exc = ZERO;
     REAL total_inh = ZERO;
@@ -155,14 +158,38 @@ static state_t neuron_model_state_update(
 
     // Update membrane voltage using exponential Euler integration (matches TensorFlow)
     // TensorFlow line 330-334:
-    // new_v = v * decay + current_factor * (input_current + asc_1 + asc_2 + g*E_L)
+    // new_v = v * decay + current_factor * (input_current + asc_1 + asc_2 + g*E_L) + reset_current
+    // NOTE: Voltage updates even during refractory period (matches TensorFlow line 321-334)
     REAL g_times_EL = neuron->g * neuron->E_L;
     neuron->V = neuron->V * neuron->v_decay +
                 neuron->current_factor * (I_total + g_times_EL);
 
-    // Update after-spike currents (exponential decay) for next timestep
+    // Add reset current if spike occurred last timestep (TensorFlow line 328, 334)
+    // reset_current = prev_z * (v_reset - v_th)
+    if (neuron->spiked_last_step) {
+        neuron->V += neuron->reset_current;
+    }
+
+    // Update after-spike currents (exponential decay) - TensorFlow line 325-326
+    // new_asc = exp(-dt * k) * asc + prev_z * asc_amp
     neuron->I_asc_0 *= neuron->exp_k0_dt;
     neuron->I_asc_1 *= neuron->exp_k1_dt;
+
+    // Add amplitude if spike occurred last timestep (uses prev_z in TensorFlow)
+    if (neuron->spiked_last_step) {
+        neuron->I_asc_0 += neuron->asc_amp_0;
+        neuron->I_asc_1 += neuron->asc_amp_1;
+        neuron->spiked_last_step = 0;  // Clear flag after processing
+    }
+
+    // Handle refractory period (TensorFlow line 341)
+    // Voltage still updates, but return value prevents spike detection
+    if (neuron->refract_timer > 0) {
+        neuron->refract_timer--;
+        // Return voltage well below threshold to prevent spiking during refractory
+        // (matches TensorFlow: new_z = tf.where(new_r > 0., tf.zeros_like(new_z), new_z))
+        return neuron->V_reset;
+    }
 
     // Return voltage for threshold comparison
     return neuron->V;
@@ -173,16 +200,17 @@ static state_t neuron_model_get_membrane_voltage(const neuron_t *neuron) {
 }
 
 static void neuron_model_has_spiked(neuron_t *restrict neuron) {
-    // Reset voltage
-    neuron->V = neuron->V_reset;
+    // Mark that spike occurred for next timestep's reset current and ASC updates
+    // (TensorFlow uses prev_z for reset and ASC amplitude addition)
+    neuron->spiked_last_step = 1;
 
-    // Update after-spike currents
-    // I_asc_j(t+) = I_asc_j(t-) * exp(-k_j * t_ref) + asc_amp_j
-    neuron->I_asc_0 = neuron->I_asc_0 * neuron->exp_k0_tref + neuron->asc_amp_0;
-    neuron->I_asc_1 = neuron->I_asc_1 * neuron->exp_k1_tref + neuron->asc_amp_1;
-
-    // Start refractory period
+    // Start refractory period (TensorFlow line 321)
     neuron->refract_timer = neuron->refract_steps;
+
+    // NOTE: Voltage and ASCs are NOT modified here. Instead:
+    // - Reset current is applied in next timestep's state_update (line 169-170)
+    // - ASC amplitude is added in next timestep's state_update (line 179-182)
+    // This matches TensorFlow's use of prev_z for delayed reset and ASC updates
 }
 
 static inline void neuron_model_print_state_variables(const neuron_t *neuron) {
