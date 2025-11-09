@@ -270,13 +270,10 @@ class GLIF3SynapseType(AbstractSynapseType):
             SpynnakerDataView.get_simulation_time_step_ms())
 
     def add_state_variables(self, state_variables):
-        # Add ALL 8 state variables (4 rise + 4 current) for correct memory allocation
-        # Order must match C struct: syn_0_rise, syn_0, syn_1_rise, syn_1, ...
-        state_variables[ISYN_0_RISE] = self._isyn_0_rise
+        # Only declare current values (4), not rise values
+        # Rise always starts at 0 (enforced in C initialization)
+        # These map to params->syn_X.init_input (4 slots in params struct)
         state_variables[ISYN_0] = self._isyn_0
-        state_variables[ISYN_1_RISE] = self._isyn_1_rise
         state_variables[ISYN_1] = self._isyn_1
-        state_variables[ISYN_2_RISE] = self._isyn_2_rise
         state_variables[ISYN_2] = self._isyn_2
-        state_variables[ISYN_3_RISE] = self._isyn_3_rise
         state_variables[ISYN_3] = self._isyn_3
