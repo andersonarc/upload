@@ -798,9 +798,12 @@ def create_V1(glif3s, ps2g, v1_synapses):
         #else:
         #    raise RuntimeError(f'inhomogenous projection {syn[:, S.RTY]}')
 
-        # Scale
+        # Scale: Convert normalized weights back to absolute units (mV)
+        # Weights in HDF5 are: weight_original / voltage_scale (normalized for TensorFlow)
+        # SpiNNaker needs: weight_original (absolute mV units)
+        # So multiply by voltage_scale to undo normalization
         vsc = network['glif3'][int(tgt_key[0]), G.VSC]
-        syn[:, S.WHT] *= vsc / 1000.0
+        syn[:, S.WHT] *= vsc  # Remove /1000.0 - that was making weights 1000x too weak!
         if p < 5:
             print(vsc)
             p += 1
@@ -845,9 +848,12 @@ def create_LGN(V1, spike_times, tm2l, lgn_synapses):
         #else:
         #    raise RuntimeError(f'inhomogenous projection {syn[:, S.RTY]}')
 
-        # Scale
+        # Scale: Convert normalized weights back to absolute units (mV)
+        # Weights in HDF5 are: weight_original / voltage_scale (normalized for TensorFlow)
+        # SpiNNaker needs: weight_original (absolute mV units)
+        # So multiply by voltage_scale to undo normalization
         vsc = network['glif3'][int(tgt_key[0]), G.VSC]
-        syn[:, S.WHT] *= vsc / 1000.0
+        syn[:, S.WHT] *= vsc  # Remove /1000.0 - that was making weights 1000x too weak!
 
         if p < 5:
             print(vsc)
