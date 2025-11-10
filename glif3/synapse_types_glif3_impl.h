@@ -169,22 +169,29 @@ static void synapse_types_shape_input(synapse_types_t *p) {
     p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay)
                                     + p->dt * decay_s1615(p->syn_0_rise_prev, p->syn_0.decay);
 
-    // TensorFlow line 318: new_psc_rise = decay*psc_rise + inputs
-    // Inputs already added by neuron_transfer, exp_shaping just does decay part
-    exp_shaping(&p->syn_0_rise);
+    // TensorFlow line 318: new_psc_rise = decay*psc_rise_OLD + inputs
+    // CRITICAL: neuron_transfer already added inputs, so psc_rise = psc_rise_OLD + inputs
+    //           We need: decay*psc_rise_OLD + inputs
+    //           But exp_shaping gives: decay*(psc_rise_OLD + inputs) = decay*psc_rise_OLD + decay*inputs
+    //           So we must manually compute to avoid extra decay on inputs
+    REAL inputs_added = p->syn_0_rise.synaptic_input_value - p->syn_0_rise_prev;
+    p->syn_0_rise.synaptic_input_value = decay_s1615(p->syn_0_rise_prev, p->syn_0_rise.decay) + inputs_added;
 
     // Repeat for other 3 receptors
     p->syn_1.synaptic_input_value = decay_s1615(p->syn_1.synaptic_input_value, p->syn_1.decay)
                                     + p->dt * decay_s1615(p->syn_1_rise_prev, p->syn_1.decay);
-    exp_shaping(&p->syn_1_rise);
+    inputs_added = p->syn_1_rise.synaptic_input_value - p->syn_1_rise_prev;
+    p->syn_1_rise.synaptic_input_value = decay_s1615(p->syn_1_rise_prev, p->syn_1_rise.decay) + inputs_added;
 
     p->syn_2.synaptic_input_value = decay_s1615(p->syn_2.synaptic_input_value, p->syn_2.decay)
                                     + p->dt * decay_s1615(p->syn_2_rise_prev, p->syn_2.decay);
-    exp_shaping(&p->syn_2_rise);
+    inputs_added = p->syn_2_rise.synaptic_input_value - p->syn_2_rise_prev;
+    p->syn_2_rise.synaptic_input_value = decay_s1615(p->syn_2_rise_prev, p->syn_2_rise.decay) + inputs_added;
 
     p->syn_3.synaptic_input_value = decay_s1615(p->syn_3.synaptic_input_value, p->syn_3.decay)
                                     + p->dt * decay_s1615(p->syn_3_rise_prev, p->syn_3.decay);
-    exp_shaping(&p->syn_3_rise);
+    inputs_added = p->syn_3_rise.synaptic_input_value - p->syn_3_rise_prev;
+    p->syn_3_rise.synaptic_input_value = decay_s1615(p->syn_3_rise_prev, p->syn_3_rise.decay) + inputs_added;
 
     // Save psc_rise AFTER decay for use in next timestep
     // CRITICAL: Save AFTER exp_shaping so psc_rise_prev has END of timestep value

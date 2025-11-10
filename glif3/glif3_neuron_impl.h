@@ -313,7 +313,6 @@ static void neuron_model_has_spiked(neuron_t *restrict neuron) {
 
     // NOTE: Voltage and ASCs NOT modified here!
     // Reset and ASC amplitude applied in NEXT timestep's state_update
-    // (lines 214-216, 238-242) when is_first_sub_step=true
     // This matches TensorFlow's use of prev_z for delayed updates
 }
 
