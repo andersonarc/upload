@@ -145,6 +145,15 @@ def load_network(path):
         # Load output neurons
         network['output'] = np.array(file['readout/neuron_ids'])
 
+        # Load background weights if available
+        if 'background/weights' in file:
+            network['background'] = np.array(file['background/weights'])
+            print(f"✓ Loaded background weights: {network['background'].shape}")
+            print(f"  Mean: {np.mean(network['background']):.6f}, Std: {np.std(network['background']):.6f}")
+        else:
+            network['background'] = None
+            print("✗ No background weights found in file")
+
         return network
 
 network = load_network('ckpt_51978-153.h5')
@@ -745,8 +754,117 @@ def nn2pol(nn, g2psl):
 output_nnpols = nn2pol(network['output'], g2psl)
 
 
+# Background weights Poisson source function
+def create_background_sources(network, V1, ps2g, n_sources=256, base_rate=10.0, weight_scale=0.01):
+    """
+    Create Poisson sources for background weights.
+
+    Args:
+        network: Network dict with 'background' key containing (n_neurons, 4) weights
+        V1: Dictionary of V1 populations
+        ps2g: Population mapping (pid, subpid) -> gids
+        n_sources: Number of Poisson source populations to create (spread the load)
+        base_rate: Base Poisson rate in Hz
+        weight_scale: Scale factor for background weights
+
+    Returns:
+        BKG: List of background Poisson populations
+        bkg_projections: Number of background projections created
+    """
+    if network['background'] is None:
+        print("✗ No background weights available")
+        return [], 0
+
+    bkg_weights = network['background']  # Shape: (n_neurons, 4)
+    n_neurons = bkg_weights.shape[0]
+    n_receptors = bkg_weights.shape[1]
+
+    print(f'\n=== Creating Background Sources ===')
+    print(f'  Poisson populations: {n_sources}')
+    print(f'  Target neurons: {n_neurons}, Receptor types: {n_receptors}')
+    print(f'  Base rate: {base_rate} Hz')
+    print(f'  Weight scale: {weight_scale}')
+    print(f'  Background weights - mean: {np.mean(bkg_weights):.6f}, std: {np.std(bkg_weights):.6f}')
+
+    # Create mapping from neurons to Poisson sources (spread the load)
+    # Each neuron gets input from one of n_sources Poisson populations
+    neuron_to_source = np.arange(n_neurons) % n_sources
+
+    # Create Poisson source populations
+    BKG = []
+    for i in range(n_sources):
+        # Single neuron per population firing at base rate
+        bkg_pop = sim.Population(
+            1,
+            sim.SpikeSourcePoisson(rate=base_rate, start=0, duration=None),
+            label=f'BKG_{i}'
+        )
+        BKG.append(bkg_pop)
+
+    print(f'  Created {len(BKG)} Poisson source populations')
+
+    # Build the reverse mapping: gid -> (pid, subpid, lid)
+    gid_to_psl = {}
+    for key, gids in ps2g.items():
+        pid, subpid = key
+        for lid, gid in enumerate(gids):
+            gid_to_psl[gid] = (pid, subpid, lid)
+
+    # Group synapses by source and target population keys
+    # Structure: {(source_idx, (tgt_pid, tgt_subpid), receptor_type): [(src_lid, tgt_lid, weight, delay), ...]}
+    synapse_groups = {}
+
+    # Iterate through all neurons and their background weights
+    for gid in range(n_neurons):
+        if gid not in gid_to_psl:
+            continue  # Skip neurons not in the population mapping
+
+        pid, subpid, lid = gid_to_psl[gid]
+        tgt_key = (pid, subpid)
+        source_idx = neuron_to_source[gid]
+
+        # For each receptor type, create a synapse if weight is non-zero
+        for receptor_type in range(n_receptors):
+            weight = bkg_weights[gid, receptor_type] * weight_scale
+
+            # Only create synapses for non-negligible weights
+            if abs(weight) > 1e-6:
+                synkey = (source_idx, tgt_key, receptor_type)
+                if synkey not in synapse_groups:
+                    synapse_groups[synkey] = []
+
+                # Add synapse: (src_lid, tgt_lid, weight, delay)
+                # src_lid is 0 since each BKG population has only 1 neuron
+                synapse_groups[synkey].append([0, lid, weight, 1.0])
+
+    # Create projections for each synapse group
+    print(f'  Creating {len(synapse_groups)} background projection groups...')
+    bkg_projections = 0
+
+    for synkey, synapses in synapse_groups.items():
+        source_idx, tgt_key, receptor_type = synkey
+        syn_array = np.array(synapses)
+
+        # Scale weights by voltage scale for the target population
+        vsc = network['glif3'][int(tgt_key[0]), G.VSC]
+        syn_array[:, 2] *= vsc / 1000.0  # Scale weights
+
+        # Create projection
+        receptor_name = f'synapse_{receptor_type}'
+        sim.Projection(
+            BKG[source_idx],
+            V1[tgt_key],
+            sim.FromListConnector(syn_array[:, [0, 1, 2, 3]]),  # src, tgt, weight, delay
+            receptor_type=receptor_name
+        )
+        bkg_projections += 1
+
+    print(f'✓ Background sources complete: {len(BKG)} populations, {bkg_projections} projections')
+    return BKG, bkg_projections
+
+
 # Do the simulation.
-# 
+#
 
 # In[12]:
 
@@ -915,11 +1033,14 @@ def create_readouts(output_nnpols, V1):
 setup()
 V1, V1_n_pop, V1_n_proj = create_V1(network['glif3'], ps2g, v1_synpols)
 LGN, LGN_n_pop, LGN_n_proj = create_LGN(V1, spike_times, tm2l, lgn_synpols)
+BKG, BKG_n_proj = create_background_sources(network, V1, ps2g, n_sources=256, base_rate=10.0, weight_scale=0.01)
 readouts = create_readouts(output_nnpols, V1)
 
 # Print statistics
+print(f'\n=== Network Statistics ===')
 print(f'V1 populations: {V1_n_pop}, V1 projections: {V1_n_proj}')
 print(f'LGN populations: {LGN_n_pop}, LGN projections: {LGN_n_proj}')
+print(f'Background populations: {len(BKG)}, Background projections: {BKG_n_proj}')
 print(f'Readout views: {len(readouts)}')
 
 
