@@ -1,0 +1,58 @@
+Decoding samples: [10, 100]
+
+Loading dataset: spikes-128.h5
+Dataset shape: (128, 600, 17400)
+Number of LGN neurons: 17400
+
+Loading LGN receptive field parameters from: lgn_full_col_cells_3.csv
+Loaded 17400 receptive field centers
+  X range: [0.0, 239.0]
+  Y range: [0.0, 119.0]
+  Size range: [2.0, 9.9]
+
+================================================================================
+ADVANCED LGN DECODING
+================================================================================
+
+Processing sample 10...
+  Reconstructing from 17400 neurons...
+
+Processing sample 100...
+  Reconstructing from 17400 neurons...
+
+✓ Saved to: lgn_decode_advanced_10_100.png
+
+================================================================================
+INTERPRETATION GUIDE
+================================================================================
+
+The decoded images show the spatial pattern of LGN activity reconstructed
+into image space using receptive field parameters.
+
+What to look for:
+
+1. **Decoded Image Quality**:
+   - Do you see recognizable digit shapes?
+   - Are failed samples' decoded images degraded or corrupted?
+   - Are working samples' decoded images clearer?
+
+2. **Activity Distribution**:
+   - Failed samples with flat/narrow distributions → weak encoding
+   - Working samples should have broader, multi-modal distributions
+
+3. **RF Coverage** (if available):
+   - Shows which parts of visual space are being sampled
+   - Uniform coverage → good spatial encoding
+   - Gaps or holes → potential encoding issues
+
+4. **RF Centers**:
+   - Hot spots should correspond to digit features
+   - Failed samples might show random/diffuse activity patterns
+
+If failed samples have systematically weaker or more uniform decoded images,
+this suggests the LGN encoding itself is the problem (not the V1 network).
+
+
+================================================================================
+COMPLETE
+================================================================================

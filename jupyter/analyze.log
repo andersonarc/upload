@@ -1,0 +1,81 @@
+================================================================================
+ANALYZING LGN ACTIVITY LEVELS: FAILED vs WORKING
+================================================================================
+
+Key insight: LGN encoding is spatially correct for ALL samples
+(verified by visual decoding with CSV)
+
+Question: What makes samples 90+ work while 10-80 fail?
+================================================================================
+
+Analyzing samples...
+
+================================================================================
+DETAILED METRICS COMPARISON
+================================================================================
+
+Metric                              Failed          Working         Ratio    p-value
+------------------------------------------------------------------------------------------
+Mean Activity During Stimulus       0.015268      0.015041        0.99x  0.0913 
+Maximum Activity                    0.088363      0.088366        1.00x  0.9993 
+Expected Total Spikes               26566.5      26172.1        0.99x  0.0913 
+Expected Spikes per Neuron          1.527      1.504        0.99x  0.0913 
+Signal-to-Noise Ratio               3.99      3.93        0.99x  0.0913 
+Active Neurons (>0.01)              10546      10407        0.99x  0.0922 
+Active Neurons (>0.05)              0      0         infx  0.1669 
+Active Neurons (>0.1)               0      0         infx  nan 
+95th Percentile Activity            0.034040      0.034010        1.00x  0.3471 
+Mean of Top 100 Neurons             0.037829      0.038108        1.01x  0.2162 
+Mean of Top 500 Neurons             0.036398      0.036459        1.00x  0.4075 
+Stimulus Onset (0-20ms)             0.008341      0.008222        0.99x  0.0759 
+
+================================================================================
+KEY FINDINGS
+================================================================================
+
+⚠️  WARNING: No significant differences in LGN activity levels!
+    This suggests the problem may be elsewhere in the network.
+
+================================================================================
+THRESHOLD ANALYSIS
+================================================================================
+
+Looking for activity thresholds that separate failed/working samples...
+
+Mean Activity:
+  Failed range:  [0.014992, 0.015572]
+  Working range: [0.014997, 0.015070]
+  ⚠️  OVERLAP: [0.014997, 0.015572]
+    Some failed samples have higher values than some working samples
+
+Top 100 Neurons:
+  Failed range:  [0.037487, 0.038145]
+  Working range: [0.037665, 0.038705]
+  ⚠️  OVERLAP: [0.037665, 0.038145]
+    Some failed samples have higher values than some working samples
+
+Expected Total Spikes:
+  Failed range:  [26086.9, 27095.1]
+  Working range: [26094.1, 26222.4]
+  ⚠️  OVERLAP: [26094.1, 27095.1]
+    Some failed samples have higher values than some working samples
+
+✓ Saved visualization: lgn_activity_threshold_analysis.png
+
+================================================================================
+CONCLUSION
+================================================================================
+
+Since LGN encoding is spatially correct (verified by visual decoding),
+the bimodal failure must be due to ACTIVITY LEVEL differences.
+
+If working samples have significantly higher LGN activity:
+→ V1 network needs a minimum input strength threshold to activate
+→ Solution: Increase LGN→V1 connection weights or reduce V1 thresholds
+
+If failed and working samples have similar LGN activity:
+→ Problem is elsewhere (V1 connectivity, ASC scaling, etc.)
+→ Need to investigate V1 network parameters more deeply
+
+Check the statistics above to determine which case applies.
+
