@@ -75,9 +75,10 @@ static inline void glif3_decay_and_init(exp_state_t *state, exp_params_t *params
     // Exponential decay per timestep: exp(-dt/tau)
     decay_t decay = expulr(-dt_over_tau);
 
-    // Standard SpiNNaker normalization: tau * (1 - exp(-dt/tau))
-    decay_t inv_decay = 1.0ulr - decay;
-    decay_t init = decay_s1615_to_u032(params->tau, inv_decay);
+    // TensorFlow line 174: psc_initial = e / tau
+    // This is 67% weaker than standard SpiNNaker for typical tau values
+    REAL e_approx = expulr(ONE);  // e ≈ 2.718
+    decay_t init = kdivk(e_approx, params->tau);
 
     state->decay = decay;
     state->init = init;
