@@ -18,8 +18,6 @@ struct synapse_types_params_t {
 
 struct synapse_types_t {
     exp_state_t syn_0_rise, syn_0, syn_1_rise, syn_1, syn_2_rise, syn_2, syn_3_rise, syn_3;
-    REAL dt;  // Full timestep in ms
-    uint32_t n_steps_per_timestep;  // For computing sub-timestep
 };
 
 #define NUM_EXCITATORY_RECEPTORS 4
@@ -40,9 +38,6 @@ static void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t 
     decay_and_init(&s->syn_2, &p->syn_2, p->time_step_ms, n);
     decay_and_init(&s->syn_3_rise, &p->syn_3, p->time_step_ms, n); s->syn_3_rise.synaptic_input_value = 0.0k;
     decay_and_init(&s->syn_3, &p->syn_3, p->time_step_ms, n);
-
-    s->dt = p->time_step_ms;
-    s->n_steps_per_timestep = n;
 }
 
 static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t *p) {
@@ -53,25 +48,23 @@ static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t 
 }
 
 static void synapse_types_shape_input(synapse_types_t *p) {
-    // Match TensorFlow line 319: new_psc = psc * decay + dt * decay * psc_rise
-    // With sub-stepping, use ts = dt / n instead of dt to avoid N× multiplication
-    REAL ts = kdivui(p->dt, p->n_steps_per_timestep);
-
+    // Match TensorFlow: new_psc_rise = decay * psc_rise + inputs (inputs added later)
+    //                   new_psc = decay * psc + decay * psc_rise (uses psc_rise after decay)
     exp_shaping(&p->syn_0_rise);
     p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
-                                     decay_s1615(ts * p->syn_0_rise.synaptic_input_value, p->syn_0.decay);
+                                     decay_s1615(p->syn_0_rise.synaptic_input_value, p->syn_0.decay);
 
     exp_shaping(&p->syn_1_rise);
     p->syn_1.synaptic_input_value = decay_s1615(p->syn_1.synaptic_input_value, p->syn_1.decay) +
-                                     decay_s1615(ts * p->syn_1_rise.synaptic_input_value, p->syn_1.decay);
+                                     decay_s1615(p->syn_1_rise.synaptic_input_value, p->syn_1.decay);
 
     exp_shaping(&p->syn_2_rise);
     p->syn_2.synaptic_input_value = decay_s1615(p->syn_2.synaptic_input_value, p->syn_2.decay) +
-                                     decay_s1615(ts * p->syn_2_rise.synaptic_input_value, p->syn_2.decay);
+                                     decay_s1615(p->syn_2_rise.synaptic_input_value, p->syn_2.decay);
 
     exp_shaping(&p->syn_3_rise);
     p->syn_3.synaptic_input_value = decay_s1615(p->syn_3.synaptic_input_value, p->syn_3.decay) +
-                                     decay_s1615(ts * p->syn_3_rise.synaptic_input_value, p->syn_3.decay);
+                                     decay_s1615(p->syn_3_rise.synaptic_input_value, p->syn_3.decay);
 }
 
 static inline void synapse_types_add_neuron_input(index_t i, synapse_types_t *p, input_t input) {
