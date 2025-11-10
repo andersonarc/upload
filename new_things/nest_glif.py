@@ -52,16 +52,20 @@ with h5py.File('mnist.h5', 'r') as f:
 label = labels[TARGET_INDEX]
 print(f"  Label: {label}")
 
-# Create spike times
+# Create spike times by sampling from spike probabilities
 print("Creating spike times...")
 sample_spikes = spike_trains[TARGET_INDEX]
-spike_indices = np.where(sample_spikes > 0)
 spike_times = {}
-for t_idx, neuron_idx in zip(*spike_indices):
-    t = max(float(t_idx + 1), 1.0)
-    if neuron_idx not in spike_times:
-        spike_times[neuron_idx] = []
-    spike_times[neuron_idx].append(t)
+
+# Sample spikes stochastically (like newclass.py)
+for neuron_idx in range(sample_spikes.shape[1]):
+    times = []
+    for t_idx in range(sample_spikes.shape[0]):
+        prob = np.clip((sample_spikes[t_idx, neuron_idx] / 1.3), 0.0, 1.0)
+        if prob > np.random.rand():
+            times.append(float(t_idx + 1.0))
+    if len(times) > 0:
+        spike_times[neuron_idx] = times
 
 print(f"  Active LGN: {len(spike_times)}")
 
@@ -98,7 +102,7 @@ for ntype in unique_types:
         'E_L': E_L,
         'V_reset': V_reset,
         'V_th': V_th,
-        'V_m': V_reset,  # Initial voltage
+        'V_m': E_L,  # Initial voltage = leak potential (not V_reset!)
         'g': g,
         't_ref': t_ref,
         'tau_syn': tau_syn,
@@ -130,11 +134,17 @@ tgt_arr = input_syns[:, 1].astype(int)
 w_arr = input_syns[:, 2]
 rtype_arr = input_syns[:, 3].astype(int)
 
-# Filter (use weights directly, no scaling!)
-mask = np.abs(w_arr) > 1e-10
+# Calculate voltage scale for each target neuron
+vsc = np.array([glif_params['V_th'][neurons[i]] - glif_params['E_L'][neurons[i]] for i in range(len(neurons))])
+
+# Scale weights by voltage scale (NOT /1000 - NEST uses pA, SpiNNaker uses nA)
+w_scaled = w_arr * vsc[tgt_arr]
+
+# Filter
+mask = np.abs(w_scaled) > 1e-10
 src_filt = src_arr[mask]
 tgt_filt = tgt_arr[mask]
-w_filt = w_arr[mask]
+w_filt = w_scaled[mask]
 rtype_filt = rtype_arr[mask] + 1  # Convert 0,1,2,3 to 1,2,3,4 for NEST
 
 # Connect
@@ -156,11 +166,14 @@ w_arr = recurrent[:, 2]
 d_arr = recurrent[:, 3]
 rtype_arr = recurrent[:, 4].astype(int)
 
-# Filter (use weights directly, no scaling!)
-mask = np.abs(w_arr) > 1e-10
+# Scale weights by voltage scale (NOT /1000 - NEST uses pA, SpiNNaker uses nA)
+w_scaled = w_arr * vsc[tgt_arr]
+
+# Filter
+mask = np.abs(w_scaled) > 1e-10
 src_filt = src_arr[mask]
 tgt_filt = tgt_arr[mask]
-w_filt = w_arr[mask]
+w_filt = w_scaled[mask]
 d_filt = np.maximum(d_arr[mask], 1.0)
 rtype_filt = rtype_arr[mask] + 1  # Convert 0,1,2,3 to 1,2,3,4 for NEST
 
