@@ -149,7 +149,8 @@ print(f"  Connected {len(v1_conns)} recurrent synapses")
 # Record spikes
 print("Setting up recording...")
 spike_rec = nest.Create('spike_recorder')
-nest.Connect(v1[output_neurons.tolist()], spike_rec)
+for oid in output_neurons:
+    nest.Connect(v1[int(oid)], spike_rec)
 
 # Run
 print("\n" + "=" * 80)
