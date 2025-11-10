@@ -48,7 +48,8 @@ static inline void glif3_decay_and_init(exp_state_t *state, exp_params_t *params
 }
 
 static void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t *p, uint32_t n) {
-    s->dt = kdivui(p->time_step_ms, n);
+    // Store FULL timestep duration (not sub-timestep) to match TensorFlow's dt
+    s->dt = p->time_step_ms;
     glif3_decay_and_init(&s->syn_0_rise, &p->syn_0, p->time_step_ms, n); s->syn_0_rise.synaptic_input_value = 0.0k;
     glif3_decay_and_init(&s->syn_0, &p->syn_0, p->time_step_ms, n);
     glif3_decay_and_init(&s->syn_1_rise, &p->syn_1, p->time_step_ms, n); s->syn_1_rise.synaptic_input_value = 0.0k;
