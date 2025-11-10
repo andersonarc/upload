@@ -1,0 +1,6 @@
+dd if=ckpt_51978-153.h5 bs=1M count=50 skip=250 of=ckpt_51978-153.h5.dd_250-rest.split
+dd if=ckpt_51978-153.h5 bs=1M count=50 skip=200 of=ckpt_51978-153.h5.dd_200-250.split
+dd if=ckpt_51978-153.h5 bs=1M count=50 skip=150 of=ckpt_51978-153.h5.dd_150-200.split
+dd if=ckpt_51978-153.h5 bs=1M count=50 skip=100 of=ckpt_51978-153.h5.dd_100-150.split
+dd if=ckpt_51978-153.h5 bs=1M count=50 skip=50 of=ckpt_51978-153.h5.dd_50-100.split
+dd if=ckpt_51978-153.h5 bs=1M count=50 of=ckpt_51978-153.h5.dd_0-50.split
