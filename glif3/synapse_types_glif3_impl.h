@@ -58,11 +58,10 @@ typedef enum input_buffer_regions {
 
 /*! \brief Initialize synapse decay and psc_initial for GLIF3
  *
- * TensorFlow line 174: psc_initial = e / tau
+ * Uses standard SpiNNaker normalization: init = tau * (1 - exp(-dt/tau))
+ * This is 67% stronger than TensorFlow's e/tau for typical tau values.
  *
- * Network was trained with this normalization, so we MUST use it.
- * Using standard SpiNNaker normalization tau*(1-exp(-dt/tau)) makes inputs
- * 67-135% too strong, causing wrong classifications (class 3 dominates).
+ * Testing to determine correct normalization with proper weight/ASC scaling.
  *
  * \param[out] state The synapse state to initialize
  * \param[in] params The synapse parameters (tau, init_input)
@@ -76,9 +75,9 @@ static inline void glif3_decay_and_init(exp_state_t *state, exp_params_t *params
     // Exponential decay per timestep: exp(-dt/tau)
     decay_t decay = expulr(-dt_over_tau);
 
-    // TensorFlow line 174: psc_initial = e / tau
-    REAL e_approx = expulr(ONE);  // e ≈ 2.718
-    decay_t init = kdivk(e_approx, params->tau);
+    // Standard SpiNNaker normalization: tau * (1 - exp(-dt/tau))
+    decay_t inv_decay = 1.0ulr - decay;
+    decay_t init = decay_s1615_to_u032(params->tau, inv_decay);
 
     state->decay = decay;
     state->init = init;
