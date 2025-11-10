@@ -29,15 +29,32 @@ typedef enum input_buffer_regions {
     SYNAPSE_0, SYNAPSE_1, SYNAPSE_2, SYNAPSE_3
 } input_buffer_regions;
 
+// Custom init for GLIF3 - uses e/tau instead of standard normalization
+static inline void glif3_decay_and_init(exp_state_t *state, exp_params_t *params,
+        REAL time_step_ms, uint32_t n_steps_per_timestep) {
+    REAL ts = kdivui(time_step_ms, n_steps_per_timestep);
+    REAL ts_over_tau = kdivk(ts, params->tau);
+    decay_t decay = expulr(-ts_over_tau);
+
+    // TensorFlow line 174: psc_initial = e / tau
+    // NOT the standard tau * (1 - exp(-dt/tau))
+    REAL e_approx = expulr(ONE);
+    decay_t init = kdivk(e_approx, params->tau);
+
+    state->decay = decay;
+    state->init = init;
+    state->synaptic_input_value = params->init_input;
+}
+
 static void synapse_types_initialise(synapse_types_t *s, synapse_types_params_t *p, uint32_t n) {
-    decay_and_init(&s->syn_0_rise, &p->syn_0, p->time_step_ms, n); s->syn_0_rise.synaptic_input_value = 0.0k;
-    decay_and_init(&s->syn_0, &p->syn_0, p->time_step_ms, n);
-    decay_and_init(&s->syn_1_rise, &p->syn_1, p->time_step_ms, n); s->syn_1_rise.synaptic_input_value = 0.0k;
-    decay_and_init(&s->syn_1, &p->syn_1, p->time_step_ms, n);
-    decay_and_init(&s->syn_2_rise, &p->syn_2, p->time_step_ms, n); s->syn_2_rise.synaptic_input_value = 0.0k;
-    decay_and_init(&s->syn_2, &p->syn_2, p->time_step_ms, n);
-    decay_and_init(&s->syn_3_rise, &p->syn_3, p->time_step_ms, n); s->syn_3_rise.synaptic_input_value = 0.0k;
-    decay_and_init(&s->syn_3, &p->syn_3, p->time_step_ms, n);
+    glif3_decay_and_init(&s->syn_0_rise, &p->syn_0, p->time_step_ms, n); s->syn_0_rise.synaptic_input_value = 0.0k;
+    glif3_decay_and_init(&s->syn_0, &p->syn_0, p->time_step_ms, n);
+    glif3_decay_and_init(&s->syn_1_rise, &p->syn_1, p->time_step_ms, n); s->syn_1_rise.synaptic_input_value = 0.0k;
+    glif3_decay_and_init(&s->syn_1, &p->syn_1, p->time_step_ms, n);
+    glif3_decay_and_init(&s->syn_2_rise, &p->syn_2, p->time_step_ms, n); s->syn_2_rise.synaptic_input_value = 0.0k;
+    glif3_decay_and_init(&s->syn_2, &p->syn_2, p->time_step_ms, n);
+    glif3_decay_and_init(&s->syn_3_rise, &p->syn_3, p->time_step_ms, n); s->syn_3_rise.synaptic_input_value = 0.0k;
+    glif3_decay_and_init(&s->syn_3, &p->syn_3, p->time_step_ms, n);
 }
 
 static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t *p) {
