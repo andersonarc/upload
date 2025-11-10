@@ -104,20 +104,13 @@ static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t 
 
 static void synapse_types_shape_input(synapse_types_t *p) {
     // Match TensorFlow line 319: new_psc = psc * decay + dt * decay * OLD_psc_rise
-    // CRITICAL: Save psc_rise at START of first sub-step (before any decay)
-    // This captures the value from AFTER neuron_transfer but BEFORE decay
+    // CRITICAL: With sub-stepping, must use ts (sub-timestep) not dt (full timestep)
+    // Otherwise contribution gets added N times (once per sub-step) instead of once total
+    // psc_rise_prev stays constant across ALL sub-steps (from END of previous FULL timestep)
     REAL dt = p->dt;
     REAL ts = kdivui(dt, p->n_steps_per_timestep);  // Sub-timestep duration
 
-    // On first sub-step, save psc_rise values (after neuron_transfer, before decay)
-    if (p->sub_step_counter == 0) {
-        p->syn_0_rise_prev = p->syn_0_rise.synaptic_input_value;
-        p->syn_1_rise_prev = p->syn_1_rise.synaptic_input_value;
-        p->syn_2_rise_prev = p->syn_2_rise.synaptic_input_value;
-        p->syn_3_rise_prev = p->syn_3_rise.synaptic_input_value;
-    }
-
-    // Compute new psc using psc_rise from START of this full timestep
+    // Compute new psc using previous FULL timestep's psc_rise values
     // Each sub-step adds ts*decay*psc_rise_prev, totaling to ~dt*decay*psc_rise_prev after N sub-steps
     p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
                                      decay_s1615(ts * p->syn_0_rise_prev, p->syn_0.decay);
@@ -134,9 +127,14 @@ static void synapse_types_shape_input(synapse_types_t *p) {
     exp_shaping(&p->syn_2_rise);
     exp_shaping(&p->syn_3_rise);
 
-    // Track sub-steps
+    // Track sub-steps and only save prev values at END of last sub-step
     p->sub_step_counter++;
     if (p->sub_step_counter >= p->n_steps_per_timestep) {
+        // Last sub-step: save decayed psc_rise values for next FULL timestep
+        p->syn_0_rise_prev = p->syn_0_rise.synaptic_input_value;
+        p->syn_1_rise_prev = p->syn_1_rise.synaptic_input_value;
+        p->syn_2_rise_prev = p->syn_2_rise.synaptic_input_value;
+        p->syn_3_rise_prev = p->syn_3_rise.synaptic_input_value;
         p->sub_step_counter = 0;  // Reset for next full timestep
     }
 }
