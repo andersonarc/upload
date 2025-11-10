@@ -150,12 +150,14 @@ static state_t neuron_model_state_update(
         input_t external_bias, REAL current_offset, neuron_t *restrict neuron) {
 
     // Track sub-timesteps to ensure reset happens only at start of new FULL timestep
+    // Check BEFORE decrementing to detect first sub-step correctly
+    bool is_first_sub_step = (neuron->sub_step_counter == neuron->n_steps_per_timestep);
+
     // Decrement counter (counts down from n_steps_per_timestep to 1)
     neuron->sub_step_counter--;
     if (neuron->sub_step_counter == 0) {
         neuron->sub_step_counter = neuron->n_steps_per_timestep; // Reset for next full timestep
     }
-    bool is_first_sub_step = (neuron->sub_step_counter == neuron->n_steps_per_timestep);
 
     // Sum excitatory and inhibitory inputs
     REAL total_exc = ZERO;
