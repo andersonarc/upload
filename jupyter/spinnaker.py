@@ -101,9 +101,15 @@ def load_network(path):
         # Scale
         network['glif3'][:, G.CM]  /= 1000.0 # pF -> nF
         network['glif3'][:, G.G]   /= 1000.0 # nS -> uS
-        network['glif3'][:, G.AA0] /= 1000.0 # pA -> nA
-        network['glif3'][:, G.AA1] /= 1000.0 # pA -> nA
+
+        # Compute voltage_scale first (needed for ASC denormalization)
         network['glif3'][:, G.VSC] = network['glif3'][:, G.THR] - network['glif3'][:, G.EL] # voltage scale
+
+        # ASC amplitudes: multiply by voltage_scale to denormalize, then convert pA -> nA
+        # Training code (models.py:154) normalized: asc_amps /= voltage_scale
+        # So we must undo: asc_amps *= voltage_scale, then convert pA -> nA
+        network['glif3'][:, G.AA0] = network['glif3'][:, G.AA0] * network['glif3'][:, G.VSC] / 1000.0
+        network['glif3'][:, G.AA1] = network['glif3'][:, G.AA1] * network['glif3'][:, G.VSC] / 1000.0
 
         # Load recurrent synapses
         network['recurrent'] = np.stack((
