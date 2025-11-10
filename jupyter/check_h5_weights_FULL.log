@@ -1,0 +1,19 @@
+================================================================================
+H5 WEIGHT VALIDATION
+================================================================================
+
+✗ ERROR: Unable to synchronously open file (file signature not found)
+Traceback (most recent call last):
+  File "/home/user/upload/jupyter/check_h5_weights.py", line 24, in <module>
+    with h5py.File(H5_FILE, 'r') as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.local/lib/python3.11/site-packages/h5py/_hl/files.py", line 566, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.local/lib/python3.11/site-packages/h5py/_hl/files.py", line 241, in make_fid
+    fid = h5f.open(name, flags, fapl=fapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 104, in h5py.h5f.open
+OSError: Unable to synchronously open file (file signature not found)
