@@ -1,0 +1,101 @@
+# Fix for c2.py - Apply Dale's Law Signs
+
+## Problem
+With Dale's law enabled, TensorFlow checkpoint may store:
+- Weight MAGNITUDES (absolute values)
+- Weight SIGNS separately (based on source neuron type)
+
+Current c2.py loads magnitudes but doesn't apply signs correctly.
+
+## Solution
+
+Add after line 152 in c2.py:
+
+```python
+# Apply Dale's law: excitatory neurons (E) have positive weights, inhibitory (I) have negative
+# Load neuron types to determine E vs I
+node_type_ids = network['node_type_ids']
+
+# In Billeh model, certain neuron types are inhibitory (check load_sparse.py for mapping)
+# Typically types with 'I' in name are inhibitory
+# For now, check if weights already have signs applied
+
+print("\nChecking weight signs...")
+print(f"Recurrent weights: {np.sum(rec_weights > 0)} positive, {np.sum(rec_weights < 0)} negative")
+print(f"Input weights: {np.sum(inp_weights > 0)} positive, {np.sum(inp_weights < 0)} negative")
+
+# If weights are all positive/non-negative, we need to apply signs
+if np.sum(rec_weights < 0) == 0 and 'recurrent_weights_sign' in model_vars:
+    print("Applying recurrent weight signs from Dale's law...")
+    rec_sign = model_vars['recurrent_weights_sign']
+    rec_weights = np.where(rec_sign, rec_weights, -rec_weights)
+elif np.sum(rec_weights < 0) == 0:
+    print("WARNING: All recurrent weights positive but no sign mask found!")
+    print("Attempting to infer signs from source neuron types...")
+
+    # Get source neuron types
+    rec_sources_typed = node_type_ids[rec_indices[:, 1]]
+
+    # Load neuron type names to identify inhibitory types
+    # This requires checking the data structure
+    # For now, apply based on receptor type as proxy
+    print("  Using receptor types as proxy for signs")
+    # Receptors 1, 3 (GABA) should receive inhibitory input
+    # But Dale's law is based on SOURCE neuron, not target receptor!
+
+if np.sum(inp_weights < 0) == 0 and 'input_weights_sign' in model_vars:
+    print("Applying input weight signs from Dale's law...")
+    inp_sign = model_vars['input_weights_sign']
+    inp_weights = np.where(inp_sign, inp_weights, -inp_weights)
+elif np.sum(inp_weights < 0) == 0:
+    print("WARNING: All input weights positive!")
+    # LGN inputs - some should be inhibitory
+```
+
+## Better Solution: Load sign masks from checkpoint
+
+Add to load_tf_checkpoint function (after line 96):
+
+```python
+            # Also load sign masks for Dale's law
+            elif 'recurrent_weights_sign' in var_name:
+                model_vars['recurrent_weights_sign'] = reader.get_tensor(var_name)
+                print(f"  -> Loaded recurrent weight signs")
+            elif 'input_weights_sign' in var_name:
+                model_vars['input_weights_sign'] = reader.get_tensor(var_name)
+                print(f"  -> Loaded input weight signs")
+```
+
+Then apply signs when saving weights (after determining rec_weights and inp_weights):
+
+```python
+# Apply Dale's law signs if available
+if 'recurrent_weights_sign' in model_vars:
+    rec_sign = model_vars['recurrent_weights_sign']
+    print(f"Applying Dale's law signs to recurrent weights...")
+    # Sign mask: True = positive, False = negative
+    rec_weights = np.abs(rec_weights) * np.where(rec_sign, 1.0, -1.0)
+    print(f"  Result: {np.sum(rec_weights > 0)} pos, {np.sum(rec_weights < 0)} neg")
+
+if 'input_weights_sign' in model_vars:
+    inp_sign = model_vars['input_weights_sign']
+    print(f"Applying Dale's law signs to input weights...")
+    inp_weights = np.abs(inp_weights) * np.where(inp_sign, 1.0, -1.0)
+    print(f"  Result: {np.sum(inp_weights > 0)} pos, {np.sum(inp_weights < 0)} neg")
+```
+
+## Quick Test
+
+Check if checkpoint has sign variables:
+
+```bash
+python3 -c "
+import tensorflow as tf
+reader = tf.train.load_checkpoint('ckpt_51978-153')
+for name in reader.get_variable_to_shape_map().keys():
+    if 'sign' in name:
+        print(name)
+"
+```
+
+If it prints sign variable names, they exist and need to be loaded!
