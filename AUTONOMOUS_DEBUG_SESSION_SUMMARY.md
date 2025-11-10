@@ -471,3 +471,138 @@ All findings are documented in markdown files and committed to the branch.
 **End of Autonomous Debug Session**
 **Status**: ✅ Major progress, critical bug found
 **Confidence**: 70% problem is solved, 30% additional issues remain
+
+---
+
+## 🔄 SECOND PASS: Verification & Correction
+
+**User Instruction**: "Run an entire 'second pass' attempting to disprove your findings"
+**User Correction**: "ASC values likely stored normalized" (contradicts my code analysis)
+
+### Re-examination Results
+
+#### ASC Scaling Bug: ⚠️ DOWNGRADED to UNCERTAIN
+
+**Original Claim (70% confidence)**: class.py multiplies by voltage_scale when should divide, making ASC 20x too large
+
+**After Second Pass**:
+- **Code analysis**: c2.py stores UNNORMALIZED values (99% confidence)
+- **User claim**: Values are "likely stored normalized"
+- **Blocker**: H5 file is empty (0 bytes), cannot verify empirically
+- **New confidence**: 50% - Cannot resolve without actual H5 file
+
+**Verification script created**: `jupyter/verify_asc_normalization.py`
+
+**Two scenarios**:
+- IF H5 has unnormalized (pA): Bug exists, fix class.py lines 123-124
+- IF H5 has normalized: No bug, class.py is correct
+
+#### Readout Ordering: ✅ CONFIRMED NO BUG  
+
+**Original claim was WRONG**. I initially thought c2.py had a bug starting at index 5.
+
+**Correction**: TensorFlow ALSO uses indices 5-14 for classes 0-9 (classification_tools.py:94). All three components (TensorFlow, c2.py, class.py) are consistent.
+
+**Lesson**: Must try to DISPROVE conclusions before recording as fact.
+
+#### Input Encoding: ✅ VERIFIED CORRECT
+
+**Confirmed**: Training multiplies by 1.3 (stim_dataset.py:113), inference divides by 1.3 (class.py:274). Correct matching behavior.
+
+#### Output Decoding: ✅ VERIFIED CORRECT
+
+**Confirmed**: 30 neurons per class, [50,100]ms response window, vote counting all standard and correct.
+
+### Summary After Second Pass
+
+| Finding | Initial | After Second Pass |
+|---------|---------|------------------|
+| ASC Scaling | 🔴 Bug (70%) | ⚠️ UNCERTAIN (50%) |
+| Readout Ordering | 🔴 Bug | ✅ NO BUG (corrected) |
+| H5 Untrained | ⚠️ Possible (30%) | ⚠️ UNCERTAIN (30%) |
+| Input Encoding | ✅ Correct | ✅ CONFIRMED |
+| Output Decoding | ✅ Correct | ✅ CONFIRMED |
+
+### Critical Blocker
+
+**Cannot verify ASC bug empirically** because:
+- H5 file at `jupyter/ckpt_51978-153.h5` is empty (0 bytes)
+- Download failed previously (403 Forbidden)
+- No c2.py conversion logs available
+- Cannot inspect actual stored values
+
+### Resolution Options
+
+**Option 1**: Fix H5 file access, run verification script
+**Option 2**: Test both fixes empirically (with/without voltage_scale multiplication)
+**Option 3**: Check original network_dat.pkl for ASC value magnitudes
+**Option 4**: Re-run c2.py conversion with logging enabled
+
+---
+
+## 📄 Complete Document List
+
+**Original Work** (before second pass):
+1. `jupyter/H5_WEIGHT_ANALYSIS.md` - H5 weight verification (code analysis)
+2. `jupyter/PP_ROUTING_ANALYSIS.md` - DELETED (wrong conclusion)
+3. `jupyter/PP_ROUTING_CORRECTION.md` - Correction of Phase 5 error
+4. `jupyter/PHASE6_ASC_INPUT_OUTPUT_ANALYSIS.md` - ASC bug + other checks
+5. `AUTONOMOUS_DEBUG_SESSION_SUMMARY.md` - Original summary
+
+**Second Pass** (verification):
+6. `SECOND_PASS_ASC_VERIFICATION.md` - Detailed ASC data flow analysis
+7. `COMPLETE_SECOND_PASS_VERIFICATION.md` - Systematic re-examination of ALL findings
+8. `jupyter/verify_asc_normalization.py` - Empirical verification script
+
+**Scripts Created**:
+- `jupyter/check_h5_weights.py` - H5 weight diagnostic
+- `training_code/visualize_weight_heatmaps.py` - Weight comparison visualization
+- `jupyter/verify_asc_normalization.py` - ASC normalization checker
+
+---
+
+## 🎯 Final Recommendations (Updated)
+
+### Priority 1: Resolve ASC Uncertainty
+
+**Cannot proceed confidently without resolving this**
+
+**Action A**: Get working H5 file
+```bash
+# Try re-downloading (may need user to fix permissions)
+python -c "import sys; sys.path.insert(0, 'jupyter'); exec(open('check_h5_weights.py').read())"
+```
+
+**Action B**: Empirical testing (if H5 unavailable)
+```python
+# Test both scenarios:
+# Version 1: Assume unnormalized (remove voltage_scale)
+network['glif3'][:, G.AA0] /= 1000.0
+network['glif3'][:, G.AA1] /= 1000.0
+
+# Version 2: Keep current (assume normalized)  
+network['glif3'][:, G.AA0] *= network['glif3'][:, G.VSC] / 1000.0
+network['glif3'][:, G.AA1] *= network['glif3'][:, G.VSC] / 1000.0
+
+# Run SpiNNaker inference with both, compare accuracy
+```
+
+### Priority 2: Verify H5 Weights
+
+**If ASC fix doesn't work**, check if weights are untrained:
+- Run `check_h5_weights.py` diagnostic
+- Run `visualize_weight_heatmaps.py` comparison
+- Check c2.py conversion logs
+
+### Priority 3: GLIF3 Implementation
+
+**If both above are OK**, investigate GLIF3 details:
+- Implement NEST version (Phase 1)
+- Compare TensorFlow vs SpiNNaker dynamics
+- Check spike timing (prev_z vs current_z)
+
+---
+
+**Session Status**: ✅ Complete with systematic second-pass verification
+**Confidence**: Medium (50% on main bug, corrected one major error)
+**Blocker**: Missing H5 file prevents definitive conclusion
