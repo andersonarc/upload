@@ -96,10 +96,10 @@ def load_tf_checkpoint(checkpoint_path, network):
                 model_vars['readout_bias'] = reader.get_tensor(var_name)
                 print(f"  -> Loaded as readout_bias")
             # ============ CRITICAL FIX: Load Dale's law sign masks ============
-            elif 'recurrent_weights_sign' in var_name:
+            elif 'recurrent_weight_positive' in var_name:
                 model_vars['recurrent_weights_sign'] = reader.get_tensor(var_name)
                 print(f"  -> Loaded recurrent weight SIGNS (Dale's law)")
-            elif 'input_weights_sign' in var_name:
+            elif 'input_weight_positive' in var_name:
                 model_vars['input_weights_sign'] = reader.get_tensor(var_name)
                 print(f"  -> Loaded input weight SIGNS (Dale's law)")
             # ==================================================================
