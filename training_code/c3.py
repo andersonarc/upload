@@ -201,10 +201,16 @@ def convert_to_pynn_format(checkpoint_path, data_dir, output_h5, n_neurons=51978
         readout_grp.create_dataset('neuron_ids', data=readout_neuron_ids.flatten().astype(np.int32))
 
         # EXTRA: Background weights (not in c2.py)
+        # Background weights represent constant input currents to each neuron at each receptor type
+        # Original shape: (n_neurons * 4,) - reshaped to (n_neurons, 4) for easier use
         if 'input_bkg_weights' in checkpoint_vars:
+            bkg_weights_flat = checkpoint_vars['input_bkg_weights']
+            bkg_weights_reshaped = bkg_weights_flat.reshape(n_neurons, 4)
             bkg_grp = f.create_group('background')
-            bkg_grp.create_dataset('weights', data=checkpoint_vars['input_bkg_weights'].astype(np.float32))
-            print(f'  + Background weights: {checkpoint_vars["input_bkg_weights"].shape}')
+            bkg_grp.create_dataset('weights', data=bkg_weights_reshaped.astype(np.float32))
+            print(f'  + Background weights: {bkg_weights_reshaped.shape} (reshaped from {bkg_weights_flat.shape})')
+            print(f'    - One weight per neuron per receptor type (4 receptor types)')
+            print(f'    - Mean: {np.mean(bkg_weights_reshaped):.6f}, Std: {np.std(bkg_weights_reshaped):.6f}')
 
     print(f'\n✓ Conversion complete:')
     print(f'  - {n_neurons} neurons')
