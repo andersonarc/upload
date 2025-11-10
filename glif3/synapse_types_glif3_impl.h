@@ -58,16 +58,10 @@ typedef enum input_buffer_regions {
 
 /*! \brief Initialize synapse decay and psc_initial for GLIF3
  *
- * TensorFlow line 174: psc_initial = e / tau
- * This differs from standard SpiNNaker normalization: tau * (1 - exp(-dt/tau))
+ * Uses standard SpiNNaker normalization: init = tau * (1 - exp(-dt/tau))
  *
- * For tau=5ms, dt=1ms:
- *   TensorFlow: e/5 = 0.544
- *   Standard SpiNNaker: 5*(1-exp(-1/5)) = 0.91
- * Using standard normalization causes ~67% stronger inputs than TensorFlow.
- *
- * Decay per timestep:
- *   decay = exp(-dt/tau)  (e.g., exp(-1.0/5) = 0.8187 per timestep)
+ * Note: TensorFlow line 174 shows psc_initial = e/tau, but the trained network
+ * weights appear to use standard normalization. Using e/tau makes inputs too weak.
  *
  * \param[out] state The synapse state to initialize
  * \param[in] params The synapse parameters (tau, init_input)
@@ -81,10 +75,9 @@ static inline void glif3_decay_and_init(exp_state_t *state, exp_params_t *params
     // Exponential decay per timestep: exp(-dt/tau)
     decay_t decay = expulr(-dt_over_tau);
 
-    // TensorFlow line 174: psc_initial = e / tau
-    // NOT standard SpiNNaker: tau * (1 - exp(-dt/tau))
-    REAL e_approx = expulr(ONE);  // Approximate e ≈ 2.718
-    decay_t init = kdivk(e_approx, params->tau);
+    // Standard SpiNNaker normalization: tau * (1 - exp(-dt/tau))
+    decay_t inv_decay = 1.0ulr - decay;
+    decay_t init = decay_s1615_to_u032(params->tau, inv_decay);
 
     state->decay = decay;
     state->init = init;

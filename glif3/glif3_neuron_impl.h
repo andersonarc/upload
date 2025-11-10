@@ -90,10 +90,6 @@ struct neuron_t {
     // Precomputed exponentials for efficiency
     REAL exp_k0_dt;           // exp(-k0 * dt) - ASC decay per timestep
     REAL exp_k1_dt;           // exp(-k1 * dt)
-    REAL exp_k0_tref;         // exp(-k0 * t_ref) - ASC decay during refractory (unused)
-    REAL exp_k1_tref;         // exp(-k1 * t_ref)
-    REAL dt_over_cm;          // dt / C_m (unused with exponential Euler)
-    REAL g_dt_over_cm;        // g * dt / C_m (unused with exponential Euler)
 
     // Exponential Euler integration constants (TensorFlow line 169-172)
     REAL v_decay;             // exp(-dt * g / C_m) = exp(-dt / tau)
@@ -145,14 +141,6 @@ static inline void neuron_model_initialise(neuron_t *state, neuron_params_t *par
     // TensorFlow line 325-326: exp(-self._dt * k) where self._dt = timestep
     state->exp_k0_dt = expk(-state->k0 * dt);
     state->exp_k1_dt = expk(-state->k1 * dt);
-
-    // Decay during refractory period (not currently used)
-    state->exp_k0_tref = expk(-state->k0 * state->t_ref);
-    state->exp_k1_tref = expk(-state->k1 * state->t_ref);
-
-    // Simple integration factors (unused with exponential Euler)
-    state->dt_over_cm = dt / state->C_m;
-    state->g_dt_over_cm = state->g * dt / state->C_m;
 
     // Exponential Euler integration constants (TensorFlow line 169-172)
     // tau = C_m / g  (membrane time constant)
