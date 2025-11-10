@@ -755,17 +755,20 @@ output_nnpols = nn2pol(network['output'], g2psl)
 
 
 # Background weights Poisson source function
-def create_background_sources(network, V1, ps2g, n_sources=256, base_rate=10.0, weight_scale=0.01):
+def create_background_sources(network, V1, ps2g, n_sources=10, base_rate=100.0, weight_scale=None):
     """
-    Create Poisson sources for background weights.
+    Create Poisson sources for background weights matching TensorFlow implementation.
+
+    TensorFlow uses 10 Poisson sources at 100 Hz (P(spike)=0.1 per 1ms timestep),
+    sums the spikes, divides by 10, and multiplies by background weights.
 
     Args:
         network: Network dict with 'background' key containing (n_neurons, 4) weights
         V1: Dictionary of V1 populations
         ps2g: Population mapping (pid, subpid) -> gids
-        n_sources: Number of Poisson source populations to create (spread the load)
-        base_rate: Base Poisson rate in Hz
-        weight_scale: Scale factor for background weights
+        n_sources: Number of Poisson sources (TensorFlow uses 10)
+        base_rate: Poisson rate in Hz (TensorFlow uses 100.0)
+        weight_scale: Deprecated, computed automatically to match TensorFlow
 
     Returns:
         BKG: List of background Poisson populations
@@ -779,12 +782,13 @@ def create_background_sources(network, V1, ps2g, n_sources=256, base_rate=10.0, 
     n_neurons = bkg_weights.shape[0]
     n_receptors = bkg_weights.shape[1]
 
-    print(f'\n=== Creating Background Sources ===')
-    print(f'  Poisson populations: {n_sources}')
+    print(f'\n=== Creating Background Sources (TensorFlow-compatible) ===')
+    print(f'  Poisson populations: {n_sources} (TF uses 10)')
+    print(f'  Base rate: {base_rate} Hz (TF uses 100 Hz)')
     print(f'  Target neurons: {n_neurons}, Receptor types: {n_receptors}')
-    print(f'  Base rate: {base_rate} Hz')
-    print(f'  Weight scale: {weight_scale}')
     print(f'  Background weights - mean: {np.mean(bkg_weights):.6f}, std: {np.std(bkg_weights):.6f}')
+    if weight_scale is not None:
+        print(f'  WARNING: weight_scale parameter is deprecated, computed automatically')
 
     # Create mapping from neurons to Poisson sources (spread the load)
     # Each neuron gets input from one of n_sources Poisson populations
@@ -823,9 +827,21 @@ def create_background_sources(network, V1, ps2g, n_sources=256, base_rate=10.0, 
         tgt_key = (pid, subpid)
         source_idx = neuron_to_source[gid]
 
+        # Get voltage scale for this neuron type
+        # In TensorFlow: checkpoint = (w_orig / vsc) * 10
+        # Effective input: checkpoint * spikes / 10 = (w_orig / vsc) * spikes
+        # In PyNN: we'll apply vsc/1000 later, so we need:
+        #   weight * vsc/1000 = checkpoint / 10
+        #   weight = checkpoint * 100 / vsc
+        vsc = network['glif3'][int(pid), G.VSC]
+
         # For each receptor type, create a synapse if weight is non-zero
         for receptor_type in range(n_receptors):
-            weight = bkg_weights[gid, receptor_type] * weight_scale
+            checkpoint_weight = bkg_weights[gid, receptor_type]
+
+            # Compute weight to match TensorFlow after vsc/1000 scaling
+            # TensorFlow divides by 10 in the forward pass (see models.py line 98)
+            weight = checkpoint_weight * 100.0 / vsc
 
             # Only create synapses for non-negligible weights
             if abs(weight) > 1e-6:
@@ -1033,7 +1049,7 @@ def create_readouts(output_nnpols, V1):
 setup()
 V1, V1_n_pop, V1_n_proj = create_V1(network['glif3'], ps2g, v1_synpols)
 LGN, LGN_n_pop, LGN_n_proj = create_LGN(V1, spike_times, tm2l, lgn_synpols)
-BKG, BKG_n_proj = create_background_sources(network, V1, ps2g, n_sources=256, base_rate=10.0, weight_scale=0.01)
+BKG, BKG_n_proj = create_background_sources(network, V1, ps2g)  # Uses TF defaults: 10 sources @ 100Hz
 readouts = create_readouts(output_nnpols, V1)
 
 # Print statistics
