@@ -142,6 +142,14 @@ def load_network(path):
             np.arange(len(file['input/weights']))
         ), axis=1)
 
+        # Load background weights from checkpoint if available
+        if 'input/bkg_weights' in file:
+            network['bkg_weights'] = np.array(file['input/bkg_weights'])  # Shape: [n_neurons, 4]
+            print(f"Loaded background weights: {network['bkg_weights'].shape}")
+        else:
+            network['bkg_weights'] = None
+            print("No background weights found in file")
+
         # Load output neurons
         network['output'] = np.array(file['readout/neuron_ids'])
 
@@ -900,6 +908,76 @@ def create_LGN(V1, spike_times, tm2l, lgn_synapses):
             pop.record(['spikes'])
     return LGN, LGN_n_pop, LGN_n_proj
 
+def create_background(V1, ps2g, g2psl, bkg_weights, rate=10.0):
+    """
+    Create background spike sources using SpikeSourcePoisson and connect to V1.
+
+    Background weights model "rest of brain" spontaneous activity like in TensorFlow.
+    """
+    if bkg_weights is None:
+        print("No background weights available, skipping background")
+        return [], 0
+
+    print(f"Creating background populations with rate={rate} Hz")
+    BKG = {}
+    BKG_n_proj = 0
+
+    # Create one background population per V1 population
+    for key, gids in ps2g.items():
+        pid, subpid = key
+        size = len(gids)
+
+        # Create Poisson spike source population
+        BKG_pop = sim.Population(
+            size,
+            sim.SpikeSourcePoisson,
+            cellparams={'rate': rate, 'start': 0.0, 'duration': 1000.0},
+            label=f'BKG_{pid}_{subpid}'
+        )
+        BKG[key] = BKG_pop
+
+    # Create projections for each receptor type (4 types)
+    for key, gids in ps2g.items():
+        pid = key[0]
+        size = len(gids)
+
+        # Get background weights for this population's neurons
+        # bkg_weights shape: [n_neurons, 4 receptors]
+        bkg_w = bkg_weights[gids, :]  # Shape: [size, 4]
+
+        # Normalize by voltage scale (like TensorFlow models.py:269)
+        vsc = network['glif3'][pid, G.VSC]
+        bkg_w_norm = bkg_w / vsc
+
+        # Scale by 10 and convert to nA (like TensorFlow models.py:271)
+        bkg_w_scaled = bkg_w_norm * 10.0 / 1000.0  # pA -> nA
+
+        # Create projection for each receptor type
+        for receptor_idx in range(4):
+            # Get weights for this receptor type
+            weights = bkg_w_scaled[:, receptor_idx]  # Shape: [size]
+
+            # Create connection list: [src_id, tgt_id, weight]
+            # One-to-one connections (background neuron i -> V1 neuron i)
+            connections = []
+            for i in range(size):
+                if abs(weights[i]) > 1e-10:  # Only non-zero connections
+                    connections.append([i, i, float(weights[i])])
+
+            if len(connections) > 0:
+                connections = np.array(connections)
+                receptor_type = f'synapse_{receptor_idx}'
+
+                sim.Projection(
+                    BKG[key], V1[key],
+                    sim.FromListConnector(connections, column_names=['weight']),
+                    receptor_type=receptor_type
+                )
+                BKG_n_proj += 1
+
+    print(f'Background populations created: {len(BKG)} populations, {BKG_n_proj} projections')
+    return list(BKG.values()), BKG_n_proj
+
 def create_readouts(output_nnpols, V1):
     readouts = []
     for key, lids in output_nnpols.items():
@@ -915,11 +993,13 @@ def create_readouts(output_nnpols, V1):
 setup()
 V1, V1_n_pop, V1_n_proj = create_V1(network['glif3'], ps2g, v1_synpols)
 LGN, LGN_n_pop, LGN_n_proj = create_LGN(V1, spike_times, tm2l, lgn_synpols)
+BKG, BKG_n_proj = create_background(V1, ps2g, g2psl, network.get('bkg_weights'), rate=10.0)
 readouts = create_readouts(output_nnpols, V1)
 
 # Print statistics
 print(f'V1 populations: {V1_n_pop}, V1 projections: {V1_n_proj}')
 print(f'LGN populations: {LGN_n_pop}, LGN projections: {LGN_n_proj}')
+print(f'BKG populations: {len(BKG)}, BKG projections: {BKG_n_proj}')
 print(f'Readout views: {len(readouts)}')
 
 
