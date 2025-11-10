@@ -1,1 +1,7 @@
 new_things/*.h5
+*.log
+FINAL_RESULTS.txt
+STATUS.md
+check_and_commit.sh
+commit.log
+monitor.log
