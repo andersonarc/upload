@@ -194,8 +194,8 @@ static void synapse_types_shape_input(synapse_types_t *p) {
     p->syn_3_rise.synaptic_input_value = decay_s1615(p->syn_3_rise_prev, p->syn_3_rise.decay) + inputs_added;
 
     // Save psc_rise AFTER decay for use in next timestep
-    // CRITICAL: Save AFTER exp_shaping so psc_rise_prev has END of timestep value
-    // Timing: This captures psc_rise AFTER decay, but BEFORE next timestep's
+    // CRITICAL: Save AFTER computing new psc_rise so psc_rise_prev has END of timestep value
+    // Timing: This captures psc_rise AFTER decay + inputs, but BEFORE next timestep's
     //         neuron_transfer adds new inputs.
     // Result: psc_rise_prev = value at END of timestep T, used in timestep T+1.
     //         Matches TensorFlow's use of psc_rise from BEFORE inputs added (line 319).
