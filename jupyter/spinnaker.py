@@ -124,6 +124,14 @@ def load_network(path):
             np.arange(len(file['input/weights']))
         ), axis=1)
 
+        # Load background weights from checkpoint if available
+        if 'input/bkg_weights' in file:
+            network['bkg_weights'] = np.array(file['input/bkg_weights'])  # Shape: [n_neurons, 4]
+            print(f"Loaded background weights: {network['bkg_weights'].shape}")
+        else:
+            network['bkg_weights'] = None
+            print("No background weights found in file")
+
         # Load output neurons
         network['output'] = np.array(file['readout/neuron_ids'])
 
@@ -766,16 +774,39 @@ def G2D(g):
         'tau_syn_3': g[G.TA3],
     }
 
-def create_V1(glif3s, ps2g, v1_synapses):
+def create_V1(glif3s, ps2g, v1_synapses, bkg_weights=None):
     # Create the V1 IF_curr_exp populations
     V1 = {}
     for key, gids in ps2g.items():
         pid, subpid = key
         size = len(gids)
+
+        # Get base parameters for this neuron type
+        cellparams = G2D(glif3s[pid])
+
+        # Apply background weights if available
+        if bkg_weights is not None:
+            # Get background weights for neurons in this population
+            # bkg_weights shape: [n_neurons, 4 receptors]
+            bkg_w = bkg_weights[gids, :]  # Shape: [size, 4]
+
+            # Normalize by voltage scale (like in TensorFlow models.py:269)
+            vsc = glif3s[pid, G.VSC]  # Voltage scale for this neuron type
+            bkg_w_norm = bkg_w / vsc  # Divide by voltage scale
+
+            # Sum across all receptor types to get total background current
+            bkg_total = np.sum(bkg_w_norm, axis=1)  # Shape: [size]
+
+            # Scale by 10 like in TensorFlow (models.py:271) and convert to nA
+            i_offset_array = bkg_total * 10.0 / 1000.0  # Convert pA to nA
+
+            # Set per-neuron i_offset
+            cellparams['i_offset'] = i_offset_array
+
         V1_N = sim.Population(
             len(gids),
             GLIF3Curr,
-            cellparams=G2D(glif3s[pid]),
+            cellparams=cellparams,
             neurons_per_core=int(np.min([200, ( 1 / size ) * 1e6])),
             label=f'V1_{pid}_{subpid}'
         )
@@ -876,7 +907,7 @@ def create_readouts(output_nnpols, V1):
 
 # Setup the simulation
 setup()
-V1, V1_n_pop, V1_n_proj = create_V1(network['glif3'], ps2g, v1_synpols)
+V1, V1_n_pop, V1_n_proj = create_V1(network['glif3'], ps2g, v1_synpols, bkg_weights=network.get('bkg_weights'))
 LGN, LGN_n_pop, LGN_n_proj = create_LGN(V1, spike_times, tm2l, lgn_synpols)
 readouts = create_readouts(output_nnpols, V1)
 
