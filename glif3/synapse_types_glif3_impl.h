@@ -10,8 +10,13 @@
  *
  * Discrete-time (TensorFlow line 318-319):
  *   new_psc_rise = exp(-dt/tau) * psc_rise + spike_inputs * psc_initial
- *   new_psc = exp(-dt/tau) * psc + exp(-dt/tau) * psc_rise_OLD
+ *   new_psc = exp(-dt/tau) * psc + dt * exp(-dt/tau) * psc_rise_OLD
  *     where psc_rise_OLD is value BEFORE spike_inputs added
+ *
+ * NOTE: TensorFlow has "dt * decay * psc_rise" but our implementation uses
+ *       "decay * psc_rise" (no dt factor). With sub-timesteps, adding dt per
+ *       sub-step causes N× over-contribution. Numerical integration via sub-steps
+ *       provides accurate evolution without explicit dt multiplication
  *
  * SpiNNaker execution order (see neuron.c, neuron_impl_standard.h):
  *   1. neuron_transfer() - adds spike_inputs to psc_rise (ONCE per timestep)
@@ -190,21 +195,9 @@ static void synapse_types_shape_input(synapse_types_t *p) {
         p->sub_step_counter = p->n_steps_per_timestep;  // Wrap to n for next timestep
     }
 
-    // On LAST sub-step of timestep T: save psc_rise for use in timestep T+1
-    // Timing: This runs AFTER all sub-steps have decayed psc_rise, but BEFORE
-    //         next timestep's neuron_transfer adds new inputs.
-    // Result: psc_rise_prev captures state from END of T-1, matches TensorFlow's
-    //         use of OLD psc_rise on line 319.
-    if (is_last_sub_step) {
-        p->syn_0_rise_prev = p->syn_0_rise.synaptic_input_value;
-        p->syn_1_rise_prev = p->syn_1_rise.synaptic_input_value;
-        p->syn_2_rise_prev = p->syn_2_rise.synaptic_input_value;
-        p->syn_3_rise_prev = p->syn_3_rise.synaptic_input_value;
-    }
-
     // TensorFlow line 319: new_psc = decay*psc + decay*psc_rise_OLD
     // psc_rise_OLD is value from BEFORE line 318 adds inputs
-    // We use psc_rise_prev saved from previous timestep
+    // We use psc_rise_prev saved from END of previous timestep (after all decays)
     p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
                                      decay_s1615(p->syn_0_rise_prev, p->syn_0.decay);
 
@@ -224,6 +217,19 @@ static void synapse_types_shape_input(synapse_types_t *p) {
     p->syn_3.synaptic_input_value = decay_s1615(p->syn_3.synaptic_input_value, p->syn_3.decay) +
                                      decay_s1615(p->syn_3_rise_prev, p->syn_3.decay);
     exp_shaping(&p->syn_3_rise);
+
+    // On LAST sub-step of timestep T: save psc_rise AFTER decay for use in timestep T+1
+    // CRITICAL: Save AFTER exp_shaping so psc_rise_prev has END of timestep value
+    // Timing: This captures psc_rise AFTER all sub-steps have decayed it, but BEFORE
+    //         next timestep's neuron_transfer adds new inputs.
+    // Result: psc_rise_prev = value at END of timestep T, used in timestep T+1.
+    //         Matches TensorFlow's use of psc_rise from BEFORE inputs added (line 319).
+    if (is_last_sub_step) {
+        p->syn_0_rise_prev = p->syn_0_rise.synaptic_input_value;
+        p->syn_1_rise_prev = p->syn_1_rise.synaptic_input_value;
+        p->syn_2_rise_prev = p->syn_2_rise.synaptic_input_value;
+        p->syn_3_rise_prev = p->syn_3_rise.synaptic_input_value;
+    }
 }
 
 /*! \brief Add spike input to synapse
