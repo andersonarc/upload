@@ -55,9 +55,10 @@ static inline void init_double_exp(exp_state_t *rise, exp_state_t *main,
     // This means spikes get decayed in the same timestep, but they shouldn't be.
     // Compensation: multiply init by exp(dt/tau) so after n sub-steps of decay, we get e/tau
     REAL e_approx = expulr(ONE);  // exp(1) = e
+    REAL e_over_tau = kdivk(e_approx, params->tau);  // e / tau
     REAL dt_over_tau = kdivk(dt, params->tau);
-    REAL compensation = expulr(dt_over_tau);  // exp(dt/tau)
-    decay_t init = kdivk(e_approx, params->tau) * compensation;  // (e/tau) * exp(dt/tau)
+    decay_t compensation = expulr(dt_over_tau);  // exp(dt/tau)
+    decay_t init = decay_s1615_to_u032(e_over_tau, compensation);  // (e/tau) * exp(dt/tau)
 
     // Both rise and main share same decay and init constants
     rise->decay = decay;
