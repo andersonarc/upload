@@ -88,9 +88,9 @@ struct neuron_t {
     REAL I_offset;
 
     // Precomputed exponentials for efficiency
-    REAL exp_k0_dt;           // exp(-k0 * dt_full) - ASC decay per FULL timestep
-    REAL exp_k1_dt;           // exp(-k1 * dt_full)
-    REAL exp_k0_tref;         // exp(-k0 * t_ref) - ASC decay during refractory (unused in current impl)
+    REAL exp_k0_dt;           // exp(-k0 * dt) - ASC decay per timestep
+    REAL exp_k1_dt;           // exp(-k1 * dt)
+    REAL exp_k0_tref;         // exp(-k0 * t_ref) - ASC decay during refractory (unused)
     REAL exp_k1_tref;         // exp(-k1 * t_ref)
     REAL dt_over_cm;          // dt / C_m (unused with exponential Euler)
     REAL g_dt_over_cm;        // g * dt / C_m (unused with exponential Euler)
@@ -102,15 +102,11 @@ struct neuron_t {
 
     // Spike tracking for TensorFlow-style delayed reset
     // TensorFlow uses prev_z: spike from PREVIOUS timestep affects CURRENT timestep
-    uint32_t spiked_last_step; // 1 if spike occurred in previous full timestep, 0 otherwise
+    uint32_t spiked_last_step; // 1 if spike occurred in previous timestep, 0 otherwise
 
     // Refractory period tracking
-    uint32_t refract_timer;   // Countdown timer in sub-timesteps
-    uint32_t refract_steps;   // Total refractory period in sub-timesteps
-
-    // Sub-timestep tracking (ensures reset happens only once per full timestep)
-    uint32_t n_steps_per_timestep; // Number of sub-steps for integration
-    uint32_t sub_step_counter;     // Counts down from n to 1 each full timestep
+    uint32_t refract_timer;   // Countdown timer in timesteps
+    uint32_t refract_steps;   // Total refractory period in timesteps
 };
 
 /*! \brief Initialize neuron state and precompute constants
@@ -119,10 +115,10 @@ struct neuron_t {
  *
  * \param[out] state Neuron state structure to initialize
  * \param[in] params Neuron parameters from SDRAM
- * \param[in] n_steps_per_timestep Number of sub-steps for numerical integration
+ * \param[in] n_steps_per_timestep Number of sub-steps per timestep (ignored, kept for compatibility)
  */
 static inline void neuron_model_initialise(neuron_t *state, neuron_params_t *params,
-        uint32_t n_steps_per_timestep) {
+        UNUSED uint32_t n_steps_per_timestep) {
 
     // Initialize state variables
     state->V = params->V_init;
@@ -142,17 +138,13 @@ static inline void neuron_model_initialise(neuron_t *state, neuron_params_t *par
     state->t_ref = params->t_ref;
     state->I_offset = params->I_offset;
 
-    // Sub-timestep duration for integration accuracy
-    // With full timestep = 1.0 ms, n=2: dt = 0.5 ms
-    REAL dt = 1.0k / (REAL) n_steps_per_timestep;
+    // Timestep duration (typically 1.0 ms)
+    REAL dt = 1.0k;
 
-    // Precompute ASC exponential decays for FULL TIMESTEP
-    // TensorFlow line 325-326: exp(-self._dt * k) where self._dt = full timestep
-    // CRITICAL: ASC must remain constant during ALL sub-steps (TensorFlow line 333 uses OLD asc),
-    //           then decay ONCE at end of full timestep. Using sub-timestep decay causes
-    //           amplitude to be incorrectly decayed and voltage to use wrong asc values.
-    state->exp_k0_dt = expk(-state->k0 * 1.0k);  // Full timestep decay
-    state->exp_k1_dt = expk(-state->k1 * 1.0k);
+    // Precompute ASC exponential decays per timestep
+    // TensorFlow line 325-326: exp(-self._dt * k) where self._dt = timestep
+    state->exp_k0_dt = expk(-state->k0 * dt);
+    state->exp_k1_dt = expk(-state->k1 * dt);
 
     // Decay during refractory period (not currently used)
     state->exp_k0_tref = expk(-state->k0 * state->t_ref);
@@ -178,14 +170,10 @@ static inline void neuron_model_initialise(neuron_t *state, neuron_params_t *par
     // Initialize spike tracking (no spike at t=0)
     state->spiked_last_step = 0;
 
-    // Refractory period in sub-timesteps
-    // Example: t_ref=2.0ms, n=2 → refract_steps = 2.0*2 = 4 sub-timesteps
-    state->refract_steps = (uint32_t) (state->t_ref * n_steps_per_timestep);
+    // Refractory period in timesteps
+    // Example: t_ref=2.0ms, dt=1.0ms → refract_steps = 2 timesteps
+    state->refract_steps = (uint32_t) state->t_ref;  // Assumes dt=1.0ms
     state->refract_timer = 0;
-
-    // Sub-timestep tracking (starts at n, counts down to 1)
-    state->n_steps_per_timestep = n_steps_per_timestep;
-    state->sub_step_counter = n_steps_per_timestep;
 }
 
 /*! \brief Save neuron state for resumption
@@ -198,7 +186,7 @@ static inline void neuron_model_save_state(neuron_t *state, neuron_params_t *par
     params->I_asc_1_init = state->I_asc_1;
 }
 
-/*! \brief Update neuron state for one sub-timestep
+/*! \brief Update neuron state for one timestep
  *
  * Implements TensorFlow lines 321-334:
  *   - Decay ASCs: exp(-dt*k) * asc
@@ -207,10 +195,9 @@ static inline void neuron_model_save_state(neuron_t *state, neuron_params_t *par
  *   - Add reset if spike last timestep: + prev_z*(v_reset - v_th)
  *   - Update refractory timer
  *
- * Called once per SUB-STEP (neuron_impl_standard.h line 310)
+ * Called once per timestep (neuron_impl_standard.h line 310)
  *
- * Critical: With sub-steps, must only apply reset/ASC on FIRST sub-step of
- *           NEXT full timestep to match TensorFlow's prev_z semantics.
+ * Critical: TensorFlow uses prev_z (spike from PREVIOUS timestep) for ASC and reset.
  *
  * \param[in] num_excitatory_inputs Number of excitatory receptors (4)
  * \param[in] exc_input Array of excitatory synaptic currents
@@ -225,19 +212,6 @@ static state_t neuron_model_state_update(
         uint16_t num_excitatory_inputs, const input_t* exc_input,
         uint16_t num_inhibitory_inputs, const input_t* inh_input,
         input_t external_bias, REAL current_offset, neuron_t *restrict neuron) {
-
-    // Sub-timestep tracking: detect FIRST and LAST sub-steps by checking BEFORE decrementing
-    // Example with n=2: counter starts at 2
-    //   Sub-step 1: is_first=true (2==2), is_last=false (2!=1), then decrement to 1
-    //   Sub-step 2: is_first=false (1!=2), is_last=true (1==1), then decrement to 0, wrap to 2
-    bool is_first_sub_step = (neuron->sub_step_counter == neuron->n_steps_per_timestep);
-    bool is_last_sub_step = (neuron->sub_step_counter == 1);
-
-    // Decrement counter (n → n-1 → ... → 1 → n → n-1 ...)
-    neuron->sub_step_counter--;
-    if (neuron->sub_step_counter == 0) {
-        neuron->sub_step_counter = neuron->n_steps_per_timestep;  // Wrap for next timestep
-    }
 
     // Sum all synaptic currents (TensorFlow line 329: input_current = sum(psc))
     REAL total_exc = ZERO;
@@ -267,26 +241,20 @@ static state_t neuron_model_state_update(
     neuron->V = neuron->V * neuron->v_decay +
                 neuron->current_factor * (I_total + g_times_EL);
 
-    // Add reset current if spike occurred last FULL timestep (TensorFlow line 328, 334)
-    // CRITICAL: Only apply on FIRST sub-step to match TensorFlow's prev_z
-    //   TensorFlow: reset_current = prev_z * (v_reset - v_th)
-    //               where prev_z is spike from timestep T-1, used in timestep T
-    //   With sub-steps: Spike in timestep T must apply reset in timestep T+1, not T
-    //                   So only apply when entering NEW full timestep (first sub-step)
-    if (neuron->spiked_last_step && is_first_sub_step) {
+    // Add reset current if spike occurred last timestep (TensorFlow line 328, 334)
+    // TensorFlow: reset_current = prev_z * (v_reset - v_th)
+    //             where prev_z is spike from timestep T-1, used in timestep T
+    if (neuron->spiked_last_step) {
         neuron->V += neuron->reset_current;
     }
 
     // Update after-spike currents (TensorFlow line 325-326)
     // new_asc_j = exp(-dt * k_j) * asc_j + prev_z * asc_amp_j
-    // Decay happens every sub-step, but amplitude only added on first sub-step
     neuron->I_asc_0 *= neuron->exp_k0_dt;
     neuron->I_asc_1 *= neuron->exp_k1_dt;
 
-    // Add ASC amplitude if spike occurred last FULL timestep (TensorFlow line 325-326)
-    // CRITICAL: Only apply on FIRST sub-step to match TensorFlow's prev_z
-    //   Prevents adding amplitude multiple times (once per sub-step) for single spike
-    if (neuron->spiked_last_step && is_first_sub_step) {
+    // Add ASC amplitude if spike occurred last timestep (TensorFlow line 325-326)
+    if (neuron->spiked_last_step) {
         neuron->I_asc_0 += neuron->asc_amp_0;
         neuron->I_asc_1 += neuron->asc_amp_1;
         neuron->spiked_last_step = 0;  // Clear flag after processing
@@ -301,7 +269,7 @@ static state_t neuron_model_state_update(
     // Voltage STILL UPDATES during refractory (line 330-334 runs regardless of r)
     // but spike detection is blocked by returning voltage below threshold
     if (neuron->refract_timer > 0) {
-        neuron->refract_timer--;  // Countdown in sub-timesteps
+        neuron->refract_timer--;  // Countdown in timesteps
         // Return V_reset to prevent spike detection (well below threshold)
         // Threshold check (neuron_impl_standard.h line 317) will see voltage < threshold
         return neuron->V_reset;
