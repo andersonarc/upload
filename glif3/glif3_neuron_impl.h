@@ -88,8 +88,8 @@ struct neuron_t {
     REAL I_offset;
 
     // Precomputed exponentials for efficiency
-    REAL exp_k0_dt;           // exp(-k0 * dt) - ASC decay per sub-timestep
-    REAL exp_k1_dt;           // exp(-k1 * dt)
+    REAL exp_k0_dt;           // exp(-k0 * dt_full) - ASC decay per FULL timestep
+    REAL exp_k1_dt;           // exp(-k1 * dt_full)
     REAL exp_k0_tref;         // exp(-k0 * t_ref) - ASC decay during refractory (unused in current impl)
     REAL exp_k1_tref;         // exp(-k1 * t_ref)
     REAL dt_over_cm;          // dt / C_m (unused with exponential Euler)
@@ -146,13 +146,13 @@ static inline void neuron_model_initialise(neuron_t *state, neuron_params_t *par
     // With full timestep = 1.0 ms, n=2: dt = 0.5 ms
     REAL dt = 1.0k / (REAL) n_steps_per_timestep;
 
-    // Precompute ASC exponential decays per SUB-TIMESTEP
-    // TensorFlow line 325-326: exp(-self._dt * k)
-    // Note: In TensorFlow, self._dt = full timestep, but with sub-stepping we
-    //       decay by smaller amount each sub-step: exp(-dt_sub * k)
-    //       Total decay over full timestep: exp(-dt_sub*k)^n = exp(-dt_full*k) ✓
-    state->exp_k0_dt = expk(-state->k0 * dt);
-    state->exp_k1_dt = expk(-state->k1 * dt);
+    // Precompute ASC exponential decays for FULL TIMESTEP
+    // TensorFlow line 325-326: exp(-self._dt * k) where self._dt = full timestep
+    // CRITICAL: ASC must remain constant during ALL sub-steps (TensorFlow line 333 uses OLD asc),
+    //           then decay ONCE at end of full timestep. Using sub-timestep decay causes
+    //           amplitude to be incorrectly decayed and voltage to use wrong asc values.
+    state->exp_k0_dt = expk(-state->k0 * 1.0k);  // Full timestep decay
+    state->exp_k1_dt = expk(-state->k1 * 1.0k);
 
     // Decay during refractory period (not currently used)
     state->exp_k0_tref = expk(-state->k0 * state->t_ref);
@@ -226,11 +226,12 @@ static state_t neuron_model_state_update(
         uint16_t num_inhibitory_inputs, const input_t* inh_input,
         input_t external_bias, REAL current_offset, neuron_t *restrict neuron) {
 
-    // Sub-timestep tracking: detect FIRST sub-step by checking BEFORE decrementing
+    // Sub-timestep tracking: detect FIRST and LAST sub-steps by checking BEFORE decrementing
     // Example with n=2: counter starts at 2
-    //   Sub-step 1: is_first=true (2==2), then decrement to 1
-    //   Sub-step 2: is_first=false (1!=2), then decrement to 0, wrap to 2
+    //   Sub-step 1: is_first=true (2==2), is_last=false (2!=1), then decrement to 1
+    //   Sub-step 2: is_first=false (1!=2), is_last=true (1==1), then decrement to 0, wrap to 2
     bool is_first_sub_step = (neuron->sub_step_counter == neuron->n_steps_per_timestep);
+    bool is_last_sub_step = (neuron->sub_step_counter == 1);
 
     // Decrement counter (n → n-1 → ... → 1 → n → n-1 ...)
     neuron->sub_step_counter--;
