@@ -943,14 +943,11 @@ def create_background(V1, ps2g, g2psl, bkg_weights, rate=10.0):
 
         # Get background weights for this population's neurons
         # bkg_weights shape: [n_neurons, 4 receptors]
+        # Checkpoint already contains (original_weights / voltage_scale) * 10 in pA
         bkg_w = bkg_weights[gids, :]  # Shape: [size, 4]
 
-        # Normalize by voltage scale (like TensorFlow models.py:269)
-        vsc = network['glif3'][pid, G.VSC]
-        bkg_w_norm = bkg_w / vsc
-
-        # Scale by 10 and convert to nA (like TensorFlow models.py:271)
-        bkg_w_scaled = bkg_w_norm * 10.0 / 1000.0  # pA -> nA
+        # Convert pA to nA (checkpoint weights are already voltage-normalized and scaled by 10)
+        bkg_w_scaled = bkg_w / 1000.0  # pA -> nA
 
         # Create projection for each receptor type
         for receptor_idx in range(4):
