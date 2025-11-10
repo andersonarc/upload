@@ -78,6 +78,10 @@ struct neuron_t {
     // Refractory period tracking
     uint32_t refract_timer;   // Refractory period timer (in time steps)
     uint32_t refract_steps;   // Total refractory period (in time steps)
+
+    // Sub-timestep tracking (for proper reset timing with sub-steps)
+    uint32_t n_steps_per_timestep; // Number of sub-steps per full timestep
+    uint32_t sub_step_counter;     // Counts down from n_steps_per_timestep to 1
 };
 
 static inline void neuron_model_initialise(neuron_t *state, neuron_params_t *params,
@@ -127,6 +131,10 @@ static inline void neuron_model_initialise(neuron_t *state, neuron_params_t *par
     // Calculate refractory period in time steps
     state->refract_steps = (uint32_t) (state->t_ref * n_steps_per_timestep);
     state->refract_timer = 0;
+
+    // Initialize sub-timestep tracking
+    state->n_steps_per_timestep = n_steps_per_timestep;
+    state->sub_step_counter = n_steps_per_timestep; // Start at first sub-step of timestep
 }
 
 static inline void neuron_model_save_state(neuron_t *state, neuron_params_t *params) {
@@ -140,6 +148,14 @@ static state_t neuron_model_state_update(
         uint16_t num_excitatory_inputs, const input_t* exc_input,
         uint16_t num_inhibitory_inputs, const input_t* inh_input,
         input_t external_bias, REAL current_offset, neuron_t *restrict neuron) {
+
+    // Track sub-timesteps to ensure reset happens only at start of new FULL timestep
+    // Decrement counter (counts down from n_steps_per_timestep to 1)
+    neuron->sub_step_counter--;
+    if (neuron->sub_step_counter == 0) {
+        neuron->sub_step_counter = neuron->n_steps_per_timestep; // Reset for next full timestep
+    }
+    bool is_first_sub_step = (neuron->sub_step_counter == neuron->n_steps_per_timestep);
 
     // Sum excitatory and inhibitory inputs
     REAL total_exc = ZERO;
@@ -164,9 +180,10 @@ static state_t neuron_model_state_update(
     neuron->V = neuron->V * neuron->v_decay +
                 neuron->current_factor * (I_total + g_times_EL);
 
-    // Add reset current if spike occurred last timestep (TensorFlow line 328, 334)
+    // Add reset current if spike occurred last FULL timestep (TensorFlow line 328, 334)
+    // CRITICAL: Only apply on first sub-step to match TensorFlow's prev_z semantics
     // reset_current = prev_z * (v_reset - v_th)
-    if (neuron->spiked_last_step) {
+    if (neuron->spiked_last_step && is_first_sub_step) {
         neuron->V += neuron->reset_current;
     }
 
@@ -175,8 +192,9 @@ static state_t neuron_model_state_update(
     neuron->I_asc_0 *= neuron->exp_k0_dt;
     neuron->I_asc_1 *= neuron->exp_k1_dt;
 
-    // Add amplitude if spike occurred last timestep (uses prev_z in TensorFlow)
-    if (neuron->spiked_last_step) {
+    // Add amplitude if spike occurred last FULL timestep (uses prev_z in TensorFlow)
+    // CRITICAL: Only apply on first sub-step to match TensorFlow's prev_z semantics
+    if (neuron->spiked_last_step && is_first_sub_step) {
         neuron->I_asc_0 += neuron->asc_amp_0;
         neuron->I_asc_1 += neuron->asc_amp_1;
         neuron->spiked_last_step = 0;  // Clear flag after processing
