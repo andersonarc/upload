@@ -134,22 +134,29 @@ def convert_to_pynn_format(checkpoint_path, data_dir, output_h5, n_neurons=51978
         if key in network:
             readout_neuron_ids = np.concatenate([readout_neuron_ids, network[key]], axis=1)
 
-    # Build GLIF3 params dict from checkpoint (matching c2.py node_params structure)
+    # Build GLIF3 params dict from checkpoint with correct naming (matching c2.py/loader expectations)
     print('Building GLIF3 parameters from checkpoint')
+
+    # Map checkpoint variable names to HDF5 parameter names expected by loader
+    # Checkpoint name -> HDF5 name mapping:
+    #   e_l -> E_L
+    #   v_reset -> V_reset
+    #   v_th -> V_th
+    #   param_g -> g
+    #   param_k -> k
+    #   syn_decay -> tau_syn
+    #   asc_amps, t_ref -> unchanged
+
     node_params = {
+        'C_m': network['node_params']['C_m'],  # Not in checkpoint, use network structure
+        'E_L': checkpoint_vars['e_l'],
+        'V_reset': checkpoint_vars['v_reset'],
+        'V_th': checkpoint_vars['v_th'],
         'asc_amps': checkpoint_vars['asc_amps'],
-        'current_factor': checkpoint_vars['current_factor'],
-        'decay': checkpoint_vars['decay'],
-        'e_l': checkpoint_vars['e_l'],
-        'param_g': checkpoint_vars['param_g'],
-        'param_k': checkpoint_vars['param_k'],
-        'psc_initial': checkpoint_vars['psc_initial'],
-        'syn_decay': checkpoint_vars['syn_decay'],
+        'g': checkpoint_vars['param_g'],
+        'k': checkpoint_vars['param_k'],
         't_ref': checkpoint_vars['t_ref'],
-        'v_reset': checkpoint_vars['v_reset'],
-        'v_th': checkpoint_vars['v_th'],
-        'voltage_offset': checkpoint_vars['voltage_offset'],
-        'voltage_scale': checkpoint_vars['voltage_scale'],
+        'tau_syn': checkpoint_vars['syn_decay'],  # Assuming syn_decay values are in correct units
     }
 
     print(f'Saving to {output_h5}')
@@ -168,8 +175,11 @@ def convert_to_pynn_format(checkpoint_path, data_dir, output_h5, n_neurons=51978
 
         # GLIF3 parameters (same structure as c2.py, but from checkpoint)
         params_grp = neuron_grp.create_group('glif3_params')
+        print('  Saving GLIF3 parameters:')
         for key, val in node_params.items():
             params_grp.create_dataset(key, data=val)
+            source = "checkpoint" if key != 'C_m' else "network"
+            print(f'    {key}: {val.shape} (from {source})')
 
         # Recurrent synapses (same structure as c2.py)
         rec_grp = f.create_group('recurrent')
