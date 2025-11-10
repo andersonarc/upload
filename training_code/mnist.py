@@ -6,7 +6,7 @@ import lgn_model
 import stim_dataset
 
 def generate_mnist_spikes(output_h5, n_samples=100, data_usage=0, intensity=1.0, 
-                          im_slice=100, pre_delay=50, post_delay=150, seed=3000):
+                          im_slice=100, pre_delay=50, post_delay=450, seed=3000):
     np.random.seed(seed)
     tf.random.set_seed(seed)
     
