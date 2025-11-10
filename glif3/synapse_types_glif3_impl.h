@@ -58,10 +58,11 @@ typedef enum input_buffer_regions {
 
 /*! \brief Initialize synapse decay and psc_initial for GLIF3
  *
- * Uses standard SpiNNaker normalization: init = tau * (1 - exp(-dt/tau))
+ * TensorFlow line 174: psc_initial = e / tau
  *
- * Note: TensorFlow line 174 shows psc_initial = e/tau, but the trained network
- * weights appear to use standard normalization. Using e/tau makes inputs too weak.
+ * Network was trained with this normalization, so we MUST use it.
+ * Using standard SpiNNaker normalization tau*(1-exp(-dt/tau)) makes inputs
+ * 67-135% too strong, causing wrong classifications (class 3 dominates).
  *
  * \param[out] state The synapse state to initialize
  * \param[in] params The synapse parameters (tau, init_input)
@@ -75,9 +76,9 @@ static inline void glif3_decay_and_init(exp_state_t *state, exp_params_t *params
     // Exponential decay per timestep: exp(-dt/tau)
     decay_t decay = expulr(-dt_over_tau);
 
-    // Standard SpiNNaker normalization: tau * (1 - exp(-dt/tau))
-    decay_t inv_decay = 1.0ulr - decay;
-    decay_t init = decay_s1615_to_u032(params->tau, inv_decay);
+    // TensorFlow line 174: psc_initial = e / tau
+    REAL e_approx = expulr(ONE);  // e ≈ 2.718
+    decay_t init = kdivk(e_approx, params->tau);
 
     state->decay = decay;
     state->init = init;
@@ -218,7 +219,7 @@ static inline void synapse_types_add_neuron_input(index_t i, synapse_types_t *p,
         &p->syn_3_rise
     };
     // add_input_exp (exp_synapse_utils.h line 70) adds: input * state->init
-    // where state->init = e/tau from glif3_decay_and_init()
+    // where state->init = e/tau (TensorFlow line 174)
     add_input_exp(ptrs[i], input);
 }
 
