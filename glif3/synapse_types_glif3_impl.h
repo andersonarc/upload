@@ -186,7 +186,8 @@ static void synapse_types_save_state(synapse_types_t *s, synapse_types_params_t 
  * \param[in,out] p Synapse state structure
  */
 static void synapse_types_shape_input(synapse_types_t *p) {
-    // Sub-timestep tracking: check counter BEFORE decrementing to detect last sub-step
+    // Sub-timestep tracking: check counter BEFORE decrementing
+    bool is_first_sub_step = (p->sub_step_counter == p->n_steps_per_timestep);
     bool is_last_sub_step = (p->sub_step_counter == 1);
 
     // Decrement counter (n → n-1 → ... → 1 → n → n-1 ...)
@@ -195,27 +196,38 @@ static void synapse_types_shape_input(synapse_types_t *p) {
         p->sub_step_counter = p->n_steps_per_timestep;  // Wrap to n for next timestep
     }
 
-    // TensorFlow line 319: new_psc = decay*psc + decay*psc_rise_OLD
-    // psc_rise_OLD is value from BEFORE line 318 adds inputs
-    // We use psc_rise_prev saved from END of previous timestep (after all decays)
-    p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay) +
-                                     decay_s1615(p->syn_0_rise_prev, p->syn_0.decay);
+    // TensorFlow line 319: new_psc = psc*decay + dt*decay*psc_rise_OLD
+    // CRITICAL: Add psc_rise contribution ONCE per full timestep (first sub-step only)
+    //           Otherwise with n sub-steps, total contribution is multiplied by ~n
+    //
+    // Decay psc every sub-step
+    p->syn_0.synaptic_input_value = decay_s1615(p->syn_0.synaptic_input_value, p->syn_0.decay);
+    // Add psc_rise_OLD contribution only on first sub-step
+    if (is_first_sub_step) {
+        p->syn_0.synaptic_input_value += p->dt * decay_s1615(p->syn_0_rise_prev, p->syn_0.decay);
+    }
 
     // TensorFlow line 318: new_psc_rise = decay*psc_rise + inputs
     // Inputs already added by neuron_transfer, exp_shaping just does decay part
     exp_shaping(&p->syn_0_rise);
 
     // Repeat for other 3 receptors
-    p->syn_1.synaptic_input_value = decay_s1615(p->syn_1.synaptic_input_value, p->syn_1.decay) +
-                                     decay_s1615(p->syn_1_rise_prev, p->syn_1.decay);
+    p->syn_1.synaptic_input_value = decay_s1615(p->syn_1.synaptic_input_value, p->syn_1.decay);
+    if (is_first_sub_step) {
+        p->syn_1.synaptic_input_value += p->dt * decay_s1615(p->syn_1_rise_prev, p->syn_1.decay);
+    }
     exp_shaping(&p->syn_1_rise);
 
-    p->syn_2.synaptic_input_value = decay_s1615(p->syn_2.synaptic_input_value, p->syn_2.decay) +
-                                     decay_s1615(p->syn_2_rise_prev, p->syn_2.decay);
+    p->syn_2.synaptic_input_value = decay_s1615(p->syn_2.synaptic_input_value, p->syn_2.decay);
+    if (is_first_sub_step) {
+        p->syn_2.synaptic_input_value += p->dt * decay_s1615(p->syn_2_rise_prev, p->syn_2.decay);
+    }
     exp_shaping(&p->syn_2_rise);
 
-    p->syn_3.synaptic_input_value = decay_s1615(p->syn_3.synaptic_input_value, p->syn_3.decay) +
-                                     decay_s1615(p->syn_3_rise_prev, p->syn_3.decay);
+    p->syn_3.synaptic_input_value = decay_s1615(p->syn_3.synaptic_input_value, p->syn_3.decay);
+    if (is_first_sub_step) {
+        p->syn_3.synaptic_input_value += p->dt * decay_s1615(p->syn_3_rise_prev, p->syn_3.decay);
+    }
     exp_shaping(&p->syn_3_rise);
 
     // On LAST sub-step of timestep T: save psc_rise AFTER decay for use in timestep T+1
