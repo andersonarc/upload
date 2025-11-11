@@ -1091,6 +1091,29 @@ for i, item in enumerate(output_nnpols.items()):
             gid2train[gid] = spiketrain
 
 print(f"Mapped {len(gid2train)} output neurons")
+
+# DEBUG: Which neurons actually fired?
+print("\n=== WHICH OUTPUT NEURONS FIRED? ===")
+fired_gids = []
+for gid, spiketrain in gid2train.items():
+    if len(spiketrain) > 0:
+        mask = (spiketrain > 50) & (spiketrain < 100)
+        if mask.sum() > 0:
+            fired_gids.append((gid, int(mask.sum())))
+
+fired_gids.sort()
+print(f"Total output neurons that fired in 50-100ms: {len(fired_gids)}")
+if len(fired_gids) > 0:
+    print("GID : spike_count (expected_class)")
+    for gid, count in fired_gids:
+        # Find which class this neuron should belong to
+        try:
+            idx = np.where(network['output'] == gid)[0][0]
+            expected_class = idx // 30
+            print(f"  {gid:5d} : {count:2d} spikes (class {expected_class})")
+        except:
+            print(f"  {gid:5d} : {count:2d} spikes (NOT IN OUTPUT!)")
+
 print("=================================\n")
 # Now slice
 print('50-200 ms')
