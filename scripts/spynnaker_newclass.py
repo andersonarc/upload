@@ -908,35 +908,33 @@ def create_LGN(V1, spike_times, tm2l, lgn_synapses):
             pop.record(['spikes'])
     return LGN, LGN_n_pop, LGN_n_proj
 
-def create_background(V1, ps2g, g2psl, bkg_weights, rate=100.0):
+def create_background(V1, ps2g, g2psl, bkg_weights, rate=10.0):
     """
     Create background spike sources using SpikeSourcePoisson and connect to V1.
 
     Background weights model "rest of brain" spontaneous activity like in TensorFlow.
+    Matches NEST implementation: 10 independent Poisson sources at 10 Hz each.
     """
     if bkg_weights is None:
         print("No background weights available, skipping background")
         return [], 0
 
-    print(f"Creating background populations with rate={rate} Hz")
-    BKG = {}
+    print(f"Creating background populations (10 sources @ {rate} Hz each, matching NEST)")
+    BKG = []
     BKG_n_proj = 0
 
-    # Create one background population per V1 population
-    for key, gids in ps2g.items():
-        pid, subpid = key
-        size = len(gids)
-
-        # Create Poisson spike source population
+    # Create 10 background source populations (matching NEST implementation)
+    # Each source fires at 10 Hz, total expected rate = 100 Hz
+    for source_idx in range(10):
         BKG_pop = sim.Population(
-            size,
+            1,  # Single global source
             sim.SpikeSourcePoisson,
             cellparams={'rate': rate, 'start': 0.0, 'duration': 1000.0},
-            label=f'BKG_{pid}_{subpid}'
+            label=f'BKG_{source_idx}'
         )
-        BKG[key] = BKG_pop
+        BKG.append(BKG_pop)
 
-    # Create projections for each receptor type (4 types)
+    # Connect each of the 10 sources to all V1 neurons (per receptor type)
     for key, gids in ps2g.items():
         pid = key[0]
         size = len(gids)
@@ -945,38 +943,41 @@ def create_background(V1, ps2g, g2psl, bkg_weights, rate=100.0):
         # bkg_weights shape: [n_neurons, 4 receptors]
         bkg_w = bkg_weights[gids, :]  # Shape: [size, 4]
 
-        # Normalize by voltage scale (like TensorFlow models.py:269)
+        # Match NEST calculation (nest_glif.py:154-155):
+        # w_filt = weights / 10.0  (divide for 10-source normalization)
+        # w_scaled = w_filt * vsc (denormalize to pA)
         vsc = network['glif3'][pid, G.VSC]
-        bkg_w_norm = bkg_w * vsc
+        w_filt = bkg_w / 10.0  # Normalize for 10-source model
+        bkg_w_scaled = w_filt * vsc / 1000.0  # Denormalize and convert pA → nA
 
-        # Scale by 10 and convert to nA (like TensorFlow models.py:271)
-        bkg_w_scaled = bkg_w_norm * 10.0 / 1000.0  # pA -> nA
-
-        # Create projection for each receptor type
+        # Create projection for each receptor type from each of the 10 sources
         for receptor_idx in range(4):
             # Get weights for this receptor type
             weights = bkg_w_scaled[:, receptor_idx]  # Shape: [size]
 
-            # Create connection list: [src_id, tgt_id, weight]
-            # One-to-one connections (background neuron i -> V1 neuron i)
-            connections = []
-            for i in range(size):
-                if abs(weights[i]) > 1e-10:  # Only non-zero connections
-                    connections.append([i, i, float(weights[i])])
+            # Filter to non-zero weights
+            mask = np.abs(weights) > 1e-10
+            if not np.any(mask):
+                continue
 
-            if len(connections) > 0:
-                connections = np.array(connections)
-                receptor_type = f'synapse_{receptor_idx}'
+            # Create connections from each of the 10 background sources
+            for source_idx in range(10):
+                # All neurons in this population receive from this source
+                # Connection: [src_id=0, tgt_id, weight] (source has single neuron at id=0)
+                connections = [[0, local_id, float(weights[local_id])]
+                              for local_id in range(size) if mask[local_id]]
 
-                sim.Projection(
-                    BKG[key], V1[key],
-                    sim.FromListConnector(connections, column_names=['weight']),
-                    receptor_type=receptor_type
-                )
-                BKG_n_proj += 1
+                if len(connections) > 0:
+                    receptor_type = f'synapse_{receptor_idx}'
+                    sim.Projection(
+                        BKG[source_idx], V1[key],
+                        sim.FromListConnector(connections, column_names=['weight']),
+                        receptor_type=receptor_type
+                    )
+                    BKG_n_proj += 1
 
-    print(f'Background populations created: {len(BKG)} populations, {BKG_n_proj} projections')
-    return list(BKG.values()), BKG_n_proj
+    print(f'Background: {len(BKG)} source populations, {BKG_n_proj} projections total')
+    return BKG, BKG_n_proj
 
 def create_readouts(output_nnpols, V1):
     readouts = []
