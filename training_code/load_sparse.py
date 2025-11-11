@@ -485,6 +485,7 @@ def load_billeh(n_input, n_neurons, core_only, data_dir, seed=3000, connected_se
             if 'localized_readout_neuron_ids_0' not in network.keys():
                 raise ValueError('Neuronal volume too small: No readout population')
     else:
+        rd = np.random.RandomState(seed=seed)
         readout_neurons_random = rd.choice(l5e_neuron_indices, size=30*15, replace=False)
         readout_neurons_random = readout_neurons_random.reshape((15, 30))
         # I still use localized name but it is not anymore!!!
