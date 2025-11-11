@@ -395,7 +395,8 @@ def load_billeh(n_input, n_neurons, core_only, data_dir, seed=3000, connected_se
         l5e_neuron_sel = np.logical_or(l5e_neuron_sel, is_l5_type)
     network['l5e_types'] = l5e_types_indices
     network['l5e_neuron_sel'] = l5e_neuron_sel
-    print(f'> Number of L5e Neurons: {np.sum(l5e_neuron_sel)}')    
+    l5e_neuron_indices = np.where(l5e_neuron_sel)[0]
+    print(f'> Number of L5e Neurons: {np.sum(l5e_neuron_sel)}')
 
     # Determine localized readout neurons
     node_h5 = h5py.File(h5_path, mode='r')
