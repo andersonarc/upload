@@ -1,4 +1,5 @@
 GLIF_network
+GLIF_network.tar.gz
 __pycache__
 lgn_model/__pycache__
 lgn_model/*.pkl
@@ -7,3 +8,5 @@ v1cortex*
 *.h5
 *.pkl
 *.log
+*.tar.gz
+*.zip
