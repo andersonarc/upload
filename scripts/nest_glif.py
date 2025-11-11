@@ -1,0 +1,295 @@
+#!/usr/bin/env python
+"""NEST GLIF3 Implementation - Proper neuron model for 80%+ accuracy"""
+
+import os
+import h5py
+import numpy as np
+import nest
+
+np.random.seed(1)
+TARGET_INDEX = int(os.environ.get('TARGET_INDEX', 0))
+
+print("=" * 80)
+print(f"NEST GLIF3 V1 Inference - Sample {TARGET_INDEX}")
+print("=" * 80)
+
+#os.chdir('/home/user/upload/new_things')
+
+# Load network
+print("Loading network...")
+with h5py.File('ckpt_51978-153.new.h5', 'r') as f:
+    neurons = np.array(f['neurons/node_type_ids'])
+
+    # Load GLIF3 parameters directly from h5
+    glif_params = {}
+    for key in f['neurons/glif3_params'].keys():
+        glif_params[key] = np.array(f['neurons/glif3_params/' + key])
+
+    recurrent = np.array([
+        f['recurrent/sources'][:],
+        f['recurrent/targets'][:],
+        f['recurrent/weights'][:],
+        f['recurrent/delays'][:],
+        f['recurrent/receptor_types'][:]
+    ]).T
+
+    input_syns = np.array([
+        f['input/sources'][:],
+        f['input/targets'][:],
+        f['input/weights'][:],
+        f['input/receptor_types'][:]
+    ]).T
+
+    output_neurons = np.array(f['readout/neuron_ids'], dtype=int)
+
+    # Load background weights (shape: n_neurons x 4 receptors)
+    bkg_weights = np.array(f['input/bkg_weights'])
+    print(f"  Background weights: {bkg_weights.shape}, non-zero: {np.sum(bkg_weights != 0)}")
+
+print(f"  Neurons: {len(neurons)}, Recurrent: {len(recurrent)}, Input: {len(input_syns)}")
+
+# Load spikes
+with h5py.File('mnist24.h5', 'r') as f:
+    spike_trains = np.array(f['spike_trains'])
+    labels = np.array(f['labels'])
+
+label = labels[TARGET_INDEX]
+print(f"  Label: {label}")
+
+# Create spike times by sampling from spike probabilities
+print("Creating spike times...")
+sample_spikes = spike_trains[TARGET_INDEX]
+spike_times = {}
+
+# Sample spikes stochastically (like newclass.py)
+for neuron_idx in range(sample_spikes.shape[1]):
+    times = []
+    for t_idx in range(sample_spikes.shape[0]):
+        prob = np.clip((sample_spikes[t_idx, neuron_idx] / 1.3), 0.0, 1.0)
+        if prob > np.random.rand():
+            times.append(float(t_idx + 1.0))
+    if len(times) > 0:
+        spike_times[neuron_idx] = times
+
+print(f"  Active LGN: {len(spike_times)}")
+
+# Setup NEST
+print("Setting up NEST...")
+nest.ResetKernel()
+nest.resolution = 1.0
+
+# Create V1 neurons with GLIF model
+print("Creating V1 with GLIF3 neurons...")
+v1 = nest.Create('glif_psc', len(neurons))
+
+# Set GLIF3 parameters by neuron type
+print("Setting GLIF3 parameters...")
+unique_types = np.unique(neurons)
+for ntype in unique_types:
+    mask = neurons == ntype
+    indices = np.where(mask)[0]
+
+    # Get parameters for this neuron type
+    C_m = float(glif_params['C_m'][ntype])
+    E_L = float(glif_params['E_L'][ntype])
+    V_reset = float(glif_params['V_reset'][ntype])
+    V_th = float(glif_params['V_th'][ntype])
+    asc_amps = tuple(float(x) for x in glif_params['asc_amps'][ntype])
+    g = float(glif_params['g'][ntype])
+    asc_decay = tuple(float(x) for x in glif_params['k'][ntype])  # k → asc_decay
+    t_ref = float(glif_params['t_ref'][ntype])
+    tau_syn = tuple(float(x) for x in glif_params['tau_syn'][ntype])
+
+    # GLIF3 configuration (LIF_ASC: after-spike currents enabled)
+    params = {
+        'C_m': C_m,
+        'E_L': E_L,
+        'V_reset': V_reset,
+        'V_th': V_th,
+        'V_m': E_L,  # Initial voltage = leak potential (not V_reset!)
+        'g': g,
+        't_ref': t_ref,
+        'tau_syn': tau_syn,
+        'asc_amps': asc_amps,
+        'asc_decay': asc_decay,
+        'after_spike_currents': True,  # Enable GLIF3 ASC
+        'spike_dependent_threshold': False,  # GLIF3 doesn't use this
+        'adapting_threshold': False  # GLIF3 doesn't use this
+    }
+
+    # Apply to all neurons of this type
+    for idx in indices:
+        v1[int(idx)].set(params)
+
+# Calculate voltage scale for each neuron (needed for weight denormalization)
+print("Calculating voltage scales...")
+vsc = np.array([glif_params['V_th'][neurons[i]] - glif_params['E_L'][neurons[i]] for i in range(len(neurons))])
+
+# Create background Poisson inputs (rest of brain)
+# TensorFlow uses: sum of 10 Bernoulli(0.1) sources / 10
+# NEST equivalent: 10 Poisson(10 Hz) generators, each with weight/10
+print("Creating background inputs (10 independent sources)...")
+bkg_generators = nest.Create('poisson_generator', 10)
+for gen in bkg_generators:
+    gen.set({'rate': 10.0, 'start': 0.0, 'stop': 1000.0})  # 10 Hz each, not 100 Hz!
+
+# Connect background to V1 for each receptor type
+print("Connecting background inputs...")
+v1_gids = np.array([n.global_id for n in v1])
+bkg_connections = 0
+
+for receptor_idx in range(4):
+    # Get weights for this receptor type
+    weights = bkg_weights[:, receptor_idx]
+
+    # Find non-zero connections
+    mask = np.abs(weights) > 1e-10
+    if np.sum(mask) == 0:
+        continue
+
+    # h5 contains: (original / voltage_scale) * 10 (from TensorFlow line 271)
+    # TensorFlow: bkg_weights * (sum_of_10_bernoullis / 10)
+    # NEST equivalent: 10 generators × (bkg_weights / 10) = sum × (bkg_weights / 10)
+    neuron_indices = np.where(mask)[0]
+    w_filt = weights[mask] / 10.0  # Divide by 10 to match TensorFlow's normalization
+    w_scaled = w_filt * vsc[neuron_indices]  # Denormalize to actual mV
+
+    gids_filt = v1_gids[neuron_indices]
+
+    # Connect each of the 10 generators to each target neuron
+    for gen in bkg_generators:
+        bkg_gid = gen.global_id
+        delays_bkg = np.ones(len(gids_filt))
+        nest.Connect([bkg_gid] * len(gids_filt), gids_filt.tolist(),
+                     conn_spec='one_to_one',
+                     syn_spec={'weight': w_scaled.tolist(),
+                              'delay': delays_bkg,
+                              'receptor_type': receptor_idx + 1})
+        bkg_connections += len(gids_filt)
+
+print(f"  Connected {bkg_connections} background synapses (10 sources per neuron)")
+
+# Create LGN
+print("Creating LGN...")
+lgn = nest.Create('spike_generator', spike_trains.shape[2])
+for i, times in spike_times.items():
+    lgn[i].set({'spike_times': times})
+
+print("Pre-computing LGN global IDs...")
+lgn_gids = np.array([n.global_id for n in lgn])
+
+# Connect LGN -> V1 (VECTORIZED)
+print("Connecting LGN -> V1...")
+src_arr = input_syns[:, 0].astype(int)
+tgt_arr = input_syns[:, 1].astype(int)
+w_arr = input_syns[:, 2]
+rtype_arr = input_syns[:, 3].astype(int)
+
+# Scale weights by voltage scale (NOT /1000 - NEST uses pA, SpiNNaker uses nA)
+w_scaled = w_arr * vsc[tgt_arr]
+
+# Filter
+mask = np.abs(w_scaled) > 1e-10
+src_filt = src_arr[mask]
+tgt_filt = tgt_arr[mask]
+w_filt = w_scaled[mask]
+rtype_filt = rtype_arr[mask] + 1  # Convert 0,1,2,3 to 1,2,3,4 for NEST
+
+# Connect
+lgn_conn_gids = lgn_gids[src_filt]
+v1_conn_gids = v1_gids[tgt_filt]
+delays_lgn = np.ones(len(w_filt))
+
+nest.Connect(lgn_conn_gids.tolist(), v1_conn_gids.tolist(),
+             conn_spec='one_to_one',
+             syn_spec={'weight': w_filt, 'delay': delays_lgn, 'receptor_type': rtype_filt.tolist()})
+
+print(f"  Connected {len(w_filt)} LGN synapses")
+
+# Connect V1 recurrent (VECTORIZED)
+print("Connecting V1 recurrent...")
+src_arr = recurrent[:, 0].astype(int)
+tgt_arr = recurrent[:, 1].astype(int)
+w_arr = recurrent[:, 2]
+d_arr = recurrent[:, 3]
+rtype_arr = recurrent[:, 4].astype(int)
+
+# Scale weights by voltage scale (NOT /1000 - NEST uses pA, SpiNNaker uses nA)
+w_scaled = w_arr * vsc[tgt_arr]
+
+# Filter
+mask = np.abs(w_scaled) > 1e-10
+src_filt = src_arr[mask]
+tgt_filt = tgt_arr[mask]
+w_filt = w_scaled[mask]
+d_filt = np.maximum(d_arr[mask], 1.0)
+rtype_filt = rtype_arr[mask] + 1  # Convert 0,1,2,3 to 1,2,3,4 for NEST
+
+print(f"Building {len(src_filt)} connections...")
+v1_src_gids = v1_gids[src_filt]
+v1_tgt_gids = v1_gids[tgt_filt]
+
+print(f"Connecting {len(v1_src_gids)} synapses...")
+nest.Connect(v1_src_gids.tolist(), v1_tgt_gids.tolist(),
+             conn_spec='one_to_one',
+             syn_spec={'weight': w_filt, 'delay': d_filt, 'receptor_type': rtype_filt.tolist()})
+
+print(f"  Connected {len(v1_src_gids)} recurrent synapses")
+
+# Record spikes
+print("Setting up recording...")
+spike_rec = nest.Create('spike_recorder')
+for oid in output_neurons:
+    nest.Connect(v1[int(oid)], spike_rec)
+
+# Run
+print("\n" + "=" * 80)
+print("Running 1000ms simulation...")
+nest.Simulate(1000.0)
+print("Done!")
+
+# Analyze
+print("\n" + "=" * 80)
+print("Analyzing results...")
+
+events = spike_rec.get('events')
+senders, times = events['senders'], events['times']
+
+# Create mapping from global ID to digit class
+sender_to_class = {}
+for i, oid in enumerate(output_neurons):
+    sender_to_class[v1_gids[oid]] = i // 30
+
+# Count votes in time windows
+for window_name, t_start, t_end in [
+    ('50-200ms', 50, 200),
+    ('50-150ms (middle)', 50, 150),
+    ('50-100ms (target)', 50, 100),
+]:
+    votes = np.zeros(10)
+    for sender, time in zip(senders, times):
+        if t_start <= time < t_end and sender in sender_to_class:
+            votes[sender_to_class[sender]] += 1
+
+    prediction = np.argmax(votes)
+    total_votes = np.sum(votes)
+
+    # Vote statistics
+    if total_votes > 0:
+        vote_ratio = votes[prediction] / total_votes if total_votes > 0 else 0
+        second_best = np.argsort(votes)[-2]
+        margin = votes[prediction] - votes[second_best] if votes[prediction] > 0 else 0
+    else:
+        vote_ratio = 0
+        second_best = -1
+        margin = 0
+
+    print(f"\n{window_name}:")
+    print(f"  Votes: {votes.astype(int)}")
+    print(f"  Total votes: {int(total_votes)}, Prediction: {prediction} ({votes[prediction]:.0f} votes, {vote_ratio*100:.1f}%)")
+    print(f"  Expected: {label}, Correct: {prediction == label}")
+    if total_votes > 0:
+        print(f"  2nd place: class {second_best} ({votes[second_best]:.0f} votes), Margin: {margin:.0f}")
+        print(f"  Error distance: |{prediction} - {label}| = {abs(prediction - label)}")
+
+print("=" * 80)
