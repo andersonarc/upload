@@ -718,6 +718,59 @@ def lgn_group_synapses(syns, l2pl, g2psl):
 
 lgn_synpols = lgn_group_synapses(network['input'], l2pl, g2psl)
 
+# ============================================================================
+# DIAGNOSTIC: Trace LGN synapses targeting class 2 output neurons
+# ============================================================================
+print("\n" + "="*80)
+print("DIAGNOSTIC: Tracing LGN synapses to class 2 neurons")
+print("="*80)
+
+class2_outputs = network['output'][60:90]
+print(f"Class 2 has {len(class2_outputs)} output neurons")
+print(f"  GID range: {class2_outputs[0]} to {class2_outputs[-1]}")
+
+# Find LGN synapses targeting class 2 neurons
+class2_synapses = []
+for i, syn in enumerate(network['input']):
+    tgt_gid = int(syn[S.TGT])
+    if tgt_gid in class2_outputs:
+        class2_synapses.append((i, syn))
+        if len(class2_synapses) >= 5:  # Just check first 5
+            break
+
+print(f"\nFound {len(class2_synapses)} LGN synapses targeting class 2 (showing first 5):")
+for syn_idx, syn in class2_synapses:
+    src_gid = int(syn[S.SRC])
+    tgt_gid = int(syn[S.TGT])
+    weight = syn[S.WHT]
+
+    print(f"\n  Synapse {syn_idx}: LGN {src_gid} → V1 {tgt_gid}, weight={weight:.4f}")
+
+    # Check LGN mapping
+    if src_gid in l2pl:
+        lgn_pid, lgn_lid = l2pl[src_gid]
+        print(f"    LGN {src_gid} → population {lgn_pid}, local ID {lgn_lid}")
+    else:
+        print(f"    ERROR: LGN {src_gid} not in l2pl!")
+        continue
+
+    # Check V1 mapping
+    if tgt_gid in g2psl:
+        tgt_pid, tgt_subpid, tgt_lid = g2psl[tgt_gid]
+        print(f"    V1 {tgt_gid} → population ({tgt_pid}, {tgt_subpid}), local ID {tgt_lid}")
+
+        # Verify round-trip
+        reconstructed_gid = ps2g[(tgt_pid, tgt_subpid)][tgt_lid]
+        if reconstructed_gid == tgt_gid:
+            print(f"    ✓ V1 mapping correct: ps2g[({tgt_pid}, {tgt_subpid})][{tgt_lid}] = {reconstructed_gid}")
+        else:
+            print(f"    ✗ ERROR: ps2g[({tgt_pid}, {tgt_subpid})][{tgt_lid}] = {reconstructed_gid} ≠ {tgt_gid}")
+    else:
+        print(f"    ERROR: V1 {tgt_gid} not in g2psl!")
+
+print("="*80 + "\n")
+# ============================================================================
+
 
 # Readout neurons to populations.
 
@@ -751,6 +804,58 @@ def nn2pol(nn, g2psl):
     return nnpols
 
 output_nnpols = nn2pol(network['output'], g2psl)
+
+# ============================================================================
+# DIAGNOSTIC: Verify population mapping is correct
+# ============================================================================
+print("\n" + "="*80)
+print("DIAGNOSTIC: Verifying population mapping")
+print("="*80)
+
+# Check a specific GID that we know fired: 37955 (class 8)
+test_gid = 37955
+if test_gid in g2psl:
+    pid, subpid, lid = g2psl[test_gid]
+    print(f"\nGID {test_gid} mapping:")
+    print(f"  → population ({pid}, {subpid}), local ID {lid}")
+    print(f"  ps2g[({pid}, {subpid})][{lid}] = {ps2g[(pid, subpid)][lid]}")
+    if ps2g[(pid, subpid)][lid] == test_gid:
+        print(f"  ✓ Round-trip mapping CORRECT")
+    else:
+        print(f"  ✗ ERROR: Round-trip gives wrong GID!")
+
+    # Show neighboring GIDs in this population
+    gids_in_pop = ps2g[(pid, subpid)]
+    print(f"  Population ({pid}, {subpid}) has {len(gids_in_pop)} neurons")
+    print(f"  First 5 GIDs: {gids_in_pop[:5]}")
+    if lid > 0:
+        print(f"  GIDs around position {lid}: {gids_in_pop[max(0,lid-2):min(len(gids_in_pop),lid+3)]}")
+
+# Check class 2 output neurons (should have fired for digit 2 input)
+print(f"\nClass 2 output neurons (indices 60-89 in output array):")
+class2_outputs = network['output'][60:90]
+print(f"  First 5 GIDs: {class2_outputs[:5]}")
+print(f"  Last 5 GIDs: {class2_outputs[-5:]}")
+
+# Check their mappings
+for i, gid in enumerate(class2_outputs[:3]):  # Check first 3
+    if gid in g2psl:
+        pid, subpid, lid = g2psl[gid]
+        print(f"  GID {gid:5d} (class 2, idx {60+i:2d}) → pop ({pid:2d}, {subpid}), lid {lid:3d}, verify: {ps2g[(pid, subpid)][lid] == gid}")
+
+# Check a class 8 output neuron
+print(f"\nClass 8 output neurons (indices 240-269 in output array):")
+class8_outputs = network['output'][240:270]
+print(f"  First 5 GIDs: {class8_outputs[:5]}")
+# Check if 37955 is in class 8 outputs
+if test_gid in class8_outputs:
+    idx = np.where(class8_outputs == test_gid)[0][0]
+    print(f"  GID {test_gid} is at position {idx} in class 8 outputs ✓")
+else:
+    print(f"  GID {test_gid} NOT in class 8 outputs!")
+
+print("="*80 + "\n")
+# ============================================================================
 
 
 # Do the simulation.
