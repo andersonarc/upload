@@ -1034,17 +1034,42 @@ for i in range(0):
 
 print(dataset['labels'][0])
 print(f"We're aiming for {label}.")
+
+# DEBUG: Check spike train annotations
+print("\n=== DEBUGGING READOUT MAPPING ===")
+first_readout = readouts[0]
+first_spiketrains = first_readout.get_data('spikes').segments[0].spiketrains
+print(f"First readout has {len(first_spiketrains)} spike trains")
+if len(first_spiketrains) > 0:
+    print(f"First spike train annotations: {first_spiketrains[0].annotations}")
+    print(f"Available annotation keys: {list(first_spiketrains[0].annotations.keys())}")
+
+# Map spike trains to global IDs
+# FIX: Use spike train annotations instead of assuming order
 gid2train = {}
 for i, item in enumerate(output_nnpols.items()):
     readout = readouts[i]
     key, lids = item
     gids = ps2g[key]
-    # Get spike trains and map them to correct global IDs
     spiketrains = readout.get_data('spikes').segments[0].spiketrains
-    for lid, spiketrain in zip(lids, spiketrains):
-        gid = gids[lid]  # Get global ID at local position lid
-        gid2train[gid] = spiketrain
-print(len(gid2train))
+
+    # Check if we can use annotations for correct mapping
+    if len(spiketrains) > 0 and 'source_id' in spiketrains[0].annotations:
+        # Use source_id annotation for correct mapping
+        for spiketrain in spiketrains:
+            source_id = spiketrain.annotations['source_id']
+            # source_id should be the population-local ID
+            gid = gids[source_id]
+            gid2train[gid] = spiketrain
+    else:
+        # Fallback to assuming order (original buggy code)
+        print(f"WARNING: No source_id annotation, assuming order (may be incorrect!)")
+        for lid, spiketrain in zip(lids, spiketrains):
+            gid = gids[lid]
+            gid2train[gid] = spiketrain
+
+print(f"Mapped {len(gid2train)} output neurons")
+print("=================================\n")
 # Now slice
 print('50-200 ms')
 votes = np.zeros(10)
