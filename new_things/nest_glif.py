@@ -17,7 +17,7 @@ os.chdir('/home/user/upload/new_things')
 
 # Load network
 print("Loading network...")
-with h5py.File('ckpt_51978-153.h5', 'r') as f:
+with h5py.File('ckpt_51978-153_NEW.h5', 'r') as f:
     neurons = np.array(f['neurons/node_type_ids'])
 
     # Load GLIF3 parameters directly from h5
@@ -42,10 +42,14 @@ with h5py.File('ckpt_51978-153.h5', 'r') as f:
 
     output_neurons = np.array(f['readout/neuron_ids'], dtype=int)
 
+    # Load background weights (shape: n_neurons x 4 receptors)
+    bkg_weights = np.array(f['input/bkg_weights'])
+    print(f"  Background weights: {bkg_weights.shape}, non-zero: {np.sum(bkg_weights != 0)}")
+
 print(f"  Neurons: {len(neurons)}, Recurrent: {len(recurrent)}, Input: {len(input_syns)}")
 
 # Load spikes
-with h5py.File('mnist.h5', 'r') as f:
+with h5py.File('mnist24.h5', 'r') as f:
     spike_trains = np.array(f['spike_trains'])
     labels = np.array(f['labels'])
 
@@ -117,14 +121,57 @@ for ntype in unique_types:
     for idx in indices:
         v1[int(idx)].set(params)
 
+# Calculate voltage scale for each neuron (needed for weight denormalization)
+print("Calculating voltage scales...")
+vsc = np.array([glif_params['V_th'][neurons[i]] - glif_params['E_L'][neurons[i]] for i in range(len(neurons))])
+
+# Create background Poisson inputs (rest of brain)
+print("Creating background inputs...")
+bkg_generator = nest.Create('poisson_generator', 1)
+bkg_generator.set({'rate': 100.0, 'start': 0.0, 'stop': 1000.0})
+
+# Connect background to V1 for each receptor type
+print("Connecting background inputs...")
+v1_gids = np.array([n.global_id for n in v1])
+bkg_connections = 0
+
+for receptor_idx in range(4):
+    # Get weights for this receptor type
+    weights = bkg_weights[:, receptor_idx]
+
+    # Find non-zero connections
+    mask = np.abs(weights) > 1e-10
+    if np.sum(mask) == 0:
+        continue
+
+    # h5 contains: (original / voltage_scale) * 10 (from TensorFlow line 271)
+    # TensorFlow divides by 10 during inference (line 98: / 10.)
+    # NEST needs actual mV, so: (h5 / 10) * vsc = (original / vsc * 10 / 10) * vsc = original
+    neuron_indices = np.where(mask)[0]
+    w_filt = weights[mask] / 10.0  # Cancel the *10 from TensorFlow variable storage
+    w_scaled = w_filt * vsc[neuron_indices]  # Denormalize to actual mV
+
+    gids_filt = v1_gids[neuron_indices]
+
+    # Connect using one_to_one
+    bkg_gid = bkg_generator.global_id
+    delays_bkg = np.ones(len(gids_filt))
+    nest.Connect([bkg_gid] * len(gids_filt), gids_filt.tolist(),
+                 conn_spec='one_to_one',
+                 syn_spec={'weight': w_scaled.tolist(),
+                          'delay': delays_bkg,
+                          'receptor_type': receptor_idx + 1})
+    bkg_connections += len(gids_filt)
+
+print(f"  Connected {bkg_connections} background synapses")
+
 # Create LGN
 print("Creating LGN...")
 lgn = nest.Create('spike_generator', spike_trains.shape[2])
 for i, times in spike_times.items():
     lgn[i].set({'spike_times': times})
 
-print("Pre-computing global IDs...")
-v1_gids = np.array([n.global_id for n in v1])
+print("Pre-computing LGN global IDs...")
 lgn_gids = np.array([n.global_id for n in lgn])
 
 # Connect LGN -> V1 (VECTORIZED)
@@ -133,9 +180,6 @@ src_arr = input_syns[:, 0].astype(int)
 tgt_arr = input_syns[:, 1].astype(int)
 w_arr = input_syns[:, 2]
 rtype_arr = input_syns[:, 3].astype(int)
-
-# Calculate voltage scale for each target neuron
-vsc = np.array([glif_params['V_th'][neurons[i]] - glif_params['E_L'][neurons[i]] for i in range(len(neurons))])
 
 # Scale weights by voltage scale (NOT /1000 - NEST uses pA, SpiNNaker uses nA)
 w_scaled = w_arr * vsc[tgt_arr]
