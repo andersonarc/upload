@@ -126,9 +126,12 @@ print("Calculating voltage scales...")
 vsc = np.array([glif_params['V_th'][neurons[i]] - glif_params['E_L'][neurons[i]] for i in range(len(neurons))])
 
 # Create background Poisson inputs (rest of brain)
-print("Creating background inputs...")
-bkg_generator = nest.Create('poisson_generator', 1)
-bkg_generator.set({'rate': 100.0, 'start': 0.0, 'stop': 1000.0})
+# TensorFlow uses: sum of 10 Bernoulli(0.1) sources / 10
+# NEST equivalent: 10 Poisson(10 Hz) generators, each with weight/10
+print("Creating background inputs (10 independent sources)...")
+bkg_generators = nest.Create('poisson_generator', 10)
+for gen in bkg_generators:
+    gen.set({'rate': 10.0, 'start': 0.0, 'stop': 1000.0})  # 10 Hz each, not 100 Hz!
 
 # Connect background to V1 for each receptor type
 print("Connecting background inputs...")
@@ -145,25 +148,26 @@ for receptor_idx in range(4):
         continue
 
     # h5 contains: (original / voltage_scale) * 10 (from TensorFlow line 271)
-    # TensorFlow divides by 10 during inference (line 98: / 10.)
-    # NEST needs actual mV, so: (h5 / 10) * vsc = (original / vsc * 10 / 10) * vsc = original
+    # TensorFlow: bkg_weights * (sum_of_10_bernoullis / 10)
+    # NEST equivalent: 10 generators × (bkg_weights / 10) = sum × (bkg_weights / 10)
     neuron_indices = np.where(mask)[0]
-    w_filt = weights[mask] / 10.0  # Cancel the *10 from TensorFlow variable storage
+    w_filt = weights[mask] / 10.0  # Divide by 10 to match TensorFlow's normalization
     w_scaled = w_filt * vsc[neuron_indices]  # Denormalize to actual mV
 
     gids_filt = v1_gids[neuron_indices]
 
-    # Connect using one_to_one
-    bkg_gid = bkg_generator.global_id
-    delays_bkg = np.ones(len(gids_filt))
-    nest.Connect([bkg_gid] * len(gids_filt), gids_filt.tolist(),
-                 conn_spec='one_to_one',
-                 syn_spec={'weight': w_scaled.tolist(),
-                          'delay': delays_bkg,
-                          'receptor_type': receptor_idx + 1})
-    bkg_connections += len(gids_filt)
+    # Connect each of the 10 generators to each target neuron
+    for gen in bkg_generators:
+        bkg_gid = gen.global_id
+        delays_bkg = np.ones(len(gids_filt))
+        nest.Connect([bkg_gid] * len(gids_filt), gids_filt.tolist(),
+                     conn_spec='one_to_one',
+                     syn_spec={'weight': w_scaled.tolist(),
+                              'delay': delays_bkg,
+                              'receptor_type': receptor_idx + 1})
+        bkg_connections += len(gids_filt)
 
-print(f"  Connected {bkg_connections} background synapses")
+print(f"  Connected {bkg_connections} background synapses (10 sources per neuron)")
 
 # Create LGN
 print("Creating LGN...")
@@ -259,6 +263,7 @@ for i, oid in enumerate(output_neurons):
 # Count votes in time windows
 for window_name, t_start, t_end in [
     ('50-200ms', 50, 200),
+    ('50-150ms (middle)', 50, 150),
     ('50-100ms (target)', 50, 100),
 ]:
     votes = np.zeros(10)
@@ -267,9 +272,24 @@ for window_name, t_start, t_end in [
             votes[sender_to_class[sender]] += 1
 
     prediction = np.argmax(votes)
+    total_votes = np.sum(votes)
+
+    # Vote statistics
+    if total_votes > 0:
+        vote_ratio = votes[prediction] / total_votes if total_votes > 0 else 0
+        second_best = np.argsort(votes)[-2]
+        margin = votes[prediction] - votes[second_best] if votes[prediction] > 0 else 0
+    else:
+        vote_ratio = 0
+        second_best = -1
+        margin = 0
+
     print(f"\n{window_name}:")
-    print(f"  Votes: {votes}")
-    print(f"  Prediction: {prediction}, Expected: {label}")
-    print(f"  Correct: {prediction == label}")
+    print(f"  Votes: {votes.astype(int)}")
+    print(f"  Total votes: {int(total_votes)}, Prediction: {prediction} ({votes[prediction]:.0f} votes, {vote_ratio*100:.1f}%)")
+    print(f"  Expected: {label}, Correct: {prediction == label}")
+    if total_votes > 0:
+        print(f"  2nd place: class {second_best} ({votes[second_best]:.0f} votes), Margin: {margin:.0f}")
+        print(f"  Error distance: |{prediction} - {label}| = {abs(prediction - label)}")
 
 print("=" * 80)
