@@ -994,7 +994,7 @@ def create_readouts(output_nnpols, V1):
 setup()
 V1, V1_n_pop, V1_n_proj = create_V1(network['glif3'], ps2g, v1_synpols)
 LGN, LGN_n_pop, LGN_n_proj = create_LGN(V1, spike_times, tm2l, lgn_synpols)
-BKG, BKG_n_proj = create_background(V1, ps2g, g2psl, network.get('bkg_weights'), rate=100.0)
+BKG, BKG_n_proj = create_background(V1, ps2g, g2psl, network.get('bkg_weights'), rate=10.0)  # 10 sources @ 10Hz each = 100Hz total
 readouts = create_readouts(output_nnpols, V1)
 
 # Print statistics
