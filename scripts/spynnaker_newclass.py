@@ -959,7 +959,9 @@ def create_V1(glif3s, ps2g, v1_synapses):
             print(f"Recurrent vsc={vsc}, weight (no test scaling): {syn[0, S.WHT]}")
             p += 1
 
-        receptor_type = f'synapse_{int(syn[0, S.RTY])}'
+        # CRITICAL FIX: Add +1 to receptor type to match NEST indexing (1-4 not 0-3)
+        # NEST explicitly converts: rtype_arr[mask] + 1  # Convert 0,1,2,3 to 1,2,3,4
+        receptor_type = f'synapse_{int(syn[0, S.RTY]) + 1}'
         sim.Projection(V1[src_key], V1[tgt_key], sim.FromListConnector(syn[:, [S.SRC, S.TGT, S.WHT, S.DLY]]), receptor_type=receptor_type)
         V1_n_proj += 1
 
@@ -1010,7 +1012,8 @@ def create_LGN(V1, spike_times, tm2l, lgn_synapses):
             print(f"LGN vsc={vsc}, weight (no test scaling): {syn[0, S.WHT]}")
             p += 1
 
-        receptor_type = f'synapse_{int(syn[0, S.RTY])}'
+        # CRITICAL FIX: Add +1 to receptor type to match NEST indexing (1-4 not 0-3)
+        receptor_type = f'synapse_{int(syn[0, S.RTY]) + 1}'
         sim.Projection(LGN[lgn_pid], V1[tgt_key], sim.FromListConnector(syn[:, [S.SRC, S.TGT, S.WHT]], column_names=['weight']), receptor_type=receptor_type)
         LGN_n_proj += 1
 
@@ -1080,7 +1083,8 @@ def create_background(V1, ps2g, g2psl, bkg_weights, rate=10.0):
                               for local_id in range(size) if mask[local_id]]
 
                 if len(connections) > 0:
-                    receptor_type = f'synapse_{receptor_idx}'
+                    # CRITICAL FIX: Add +1 to receptor type to match NEST indexing (1-4 not 0-3)
+                    receptor_type = f'synapse_{receptor_idx + 1}'
                     sim.Projection(
                         BKG[source_idx], V1[key],
                         sim.FromListConnector(connections, column_names=['weight']),
