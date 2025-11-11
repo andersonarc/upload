@@ -89,12 +89,19 @@ def create_model(network, input_population, bkg_weights, seq_len=100, n_input=10
             output2 = tf.reduce_mean(output2, -1)
             output = tf.stack([output1[..., -1], output2[..., -1]], -1) * scale
         elif output_mode == '10class':
+            #tf.print('===== OUTPUTS 10class')
             outputs = []
             for i in range(10):
+                #tf.print(f'CLASS {i}')
                 t_output = tf.gather(output_spikes, network[f'localized_readout_neuron_ids_{i + 5}'], axis=2)
+                #tf.print(t_output)
+                #tf.print('\n MEAN:')
                 t_output = tf.reduce_mean(t_output, -1)
+                #tf.print('\n')
                 outputs.append(t_output)
             output = tf.concat(outputs, -1) * scale
+            #tf.print('\n FINAL scaled by {scale}:')
+            #tf.print(output)
         else:
             raise ValueError(f'Unrecognized output_mode: {output_mode}')
     else:

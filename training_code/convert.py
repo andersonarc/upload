@@ -46,7 +46,7 @@ def load_tf_checkpoint(checkpoint_path, network):
     # Try to restore the checkpoint
     checkpoint_dir = os.path.dirname(checkpoint_path)
 
-    if tf.train.latest_checkpoint(checkpoint_dir) or True:
+    if tf.train.latest_checkpoint(checkpoint_dir):
         restored = checkpoint.restore(checkpoint_path)
         if restored:
             print(f"Successfully restored checkpoint from {checkpoint_path}")
@@ -55,7 +55,11 @@ def load_tf_checkpoint(checkpoint_path, network):
             return {}
     else:
         print(f"Warning: No checkpoint found at {checkpoint_path}")
-        return {}
+        print(np.shape(bkg_weights))
+        n_neurons = 51978
+        n_receptors = 4
+        bkg_weights_by_receptor = bkg_weights.reshape((n_neurons, n_receptors))
+        return { 'bkg_weights': bkg_weights_by_receptor }
 
     # Extract the trained weights
     model_vars = {}

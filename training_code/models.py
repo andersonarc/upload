@@ -64,13 +64,15 @@ class SparseLayer(tf.keras.layers.Layer):
             self.noise_data = tf.convert_to_tensor(tmp['additive_noise'].reshape(-1), dtype=self._compute_dtype)
 
     def call(self, inp):
-        print(inp)
-        tf.print(inp[0, :, 0])
+        tf.print('===== INPUT neuron 0 =====')
+        tf.print(inp.shape)
+        tf.print(inp[:, :, 0])
         tf_shp = tf.unstack(tf.shape(inp))
         shp = inp.shape.as_list()
         for i, a in enumerate(shp):
             if a is None:
                 shp[i] = tf_shp[i]
+        tf.print('\n')
 
         sparse_w_in = tf.sparse.SparseTensor(
             self._indices, self._weights, self._dense_shape)
@@ -79,7 +81,11 @@ class SparseLayer(tf.keras.layers.Layer):
         input_current = tf.sparse.sparse_dense_matmul(sparse_w_in, tf.cast(inp, tf.float32), adjoint_b=True)
         input_current = tf.transpose(input_current)
         input_current = tf.cast(input_current, self._dtype)
+
+        tf.print('===== INPUT CURRENT neuron 0 =====')
+        tf.print(input_current.shape)
         tf.print(input_current)
+        tf.print('\n')
         if self._use_decoded_noise:
             # quick noise: sample every step
             gen_ind_quick = tf.random.uniform(shape=(shp[0], shp[1], self._dense_shape[0]), maxval=28406000, dtype=tf.int64) # batch, seq_len, neurons*4

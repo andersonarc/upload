@@ -218,12 +218,21 @@ def main(_):
         _initial_state = tf.nest.map_structure(lambda _a: _a.read_value(), state_variables)
         _out, _p, _ = extractor_model((_x, _initial_state))
         _z, _v = _out[0]
+        #tf.print('SPIKES: \n')
+        #tf.print(_z.shape)
+        #tf.print(_z)
         voltage_32 = (tf.cast(_v, tf.float32) - rsnn_layer.cell.voltage_offset) / rsnn_layer.cell.voltage_scale
         v_pos = tf.square(tf.nn.relu(voltage_32 - 1.))
         v_neg = tf.square(tf.nn.relu(-voltage_32 + 1.))
         voltage_loss = tf.reduce_mean(tf.reduce_sum(v_pos + v_neg, -1)) * flags.voltage_cost
         rate_loss = rate_distribution_regularizer(_z)
         classification_loss = compute_loss(_y, _p, _w)
+        tf.print(_y.shape)
+        tf.print(_p.shape)
+        for i in range(10):
+            tf.print(f'\n{i}: ')
+            tf.print(_p[:, :, i]) 
+        tf.print(_w.shape)
         _aux = dict(rate_loss=rate_loss, voltage_loss=voltage_loss)
         _loss = classification_loss + rate_loss + voltage_loss
         return _out, _p, _loss, _aux
