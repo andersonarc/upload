@@ -1042,6 +1042,21 @@ for i in range(0):
 print(dataset['labels'][0])
 print(f"We're aiming for {label}.")
 
+# DEBUG: Verify output neuron ordering
+print("\n=== DEBUGGING OUTPUT NEURON ORDER ===")
+print(f"Total output neurons: {len(network['output'])}")
+print(f"First 10 output neuron GIDs: {network['output'][:10]}")
+print(f"Output neurons 30-40 (class 1): {network['output'][30:40]}")
+print(f"Output neurons 60-70 (class 2): {network['output'][60:70]}")
+print(f"Are output neurons sorted? {np.all(network['output'][:-1] <= network['output'][1:])}")
+
+# Check if any output neurons are actually in readout views
+print(f"\nReadout views created: {len(readouts)}")
+for i, item in enumerate(output_nnpols.items()):
+    key, lids = item
+    print(f"  Readout {i}: population {key}, {len(lids)} neurons, lids={lids[:5]}...")
+print("=================================\n")
+
 # DEBUG: Check spike train annotations
 print("\n=== DEBUGGING READOUT MAPPING ===")
 first_readout = readouts[0]
