@@ -843,11 +843,15 @@ def create_V1(glif3s, ps2g, v1_synapses):
         #else:
         #    raise RuntimeError(f'inhomogenous projection {syn[:, S.RTY]}')
 
-        # Scale
+        # Scale: denormalize and convert pA → nA
         vsc = network['glif3'][int(tgt_key[0]), G.VSC]
         syn[:, S.WHT] *= vsc / 1000.0
+
+        # TEMPORARY TEST: 1.66× scaling to match NEST peak-at-tau PSC normalization
+        syn[:, S.WHT] *= 1.66
+
         if p < 5:
-            print(vsc)
+            print(f"Recurrent vsc={vsc}, weight after 1.66× test: {syn[0, S.WHT]}")
             p += 1
 
         receptor_type = f'synapse_{int(syn[0, S.RTY])}'
@@ -890,12 +894,15 @@ def create_LGN(V1, spike_times, tm2l, lgn_synapses):
         #else:
         #    raise RuntimeError(f'inhomogenous projection {syn[:, S.RTY]}')
 
-        # Scale
+        # Scale: denormalize and convert pA → nA
         vsc = network['glif3'][int(tgt_key[0]), G.VSC]
         syn[:, S.WHT] *= vsc / 1000.0
 
+        # TEMPORARY TEST: 1.66× scaling to match NEST peak-at-tau PSC normalization
+        syn[:, S.WHT] *= 1.66
+
         if p < 5:
-            print(vsc)
+            print(f"LGN vsc={vsc}, weight after 1.66× test: {syn[0, S.WHT]}")
             p += 1
 
         receptor_type = f'synapse_{int(syn[0, S.RTY])}'
