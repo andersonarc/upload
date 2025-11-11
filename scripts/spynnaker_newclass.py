@@ -952,11 +952,11 @@ def create_V1(glif3s, ps2g, v1_synapses):
         vsc = network['glif3'][int(tgt_key[0]), G.VSC]
         syn[:, S.WHT] *= vsc / 1000.0
 
-        # TEMPORARY TEST: 1.66× scaling to match NEST peak-at-tau PSC normalization
-        syn[:, S.WHT] *= 1.66
+        # NOTE: Removed 1.66× test scaling since PSC normalization was fixed in C code
+        # (Double-correction was likely causing issues)
 
         if p < 5:
-            print(f"Recurrent vsc={vsc}, weight after 1.66× test: {syn[0, S.WHT]}")
+            print(f"Recurrent vsc={vsc}, weight (no test scaling): {syn[0, S.WHT]}")
             p += 1
 
         receptor_type = f'synapse_{int(syn[0, S.RTY])}'
@@ -1003,11 +1003,11 @@ def create_LGN(V1, spike_times, tm2l, lgn_synapses):
         vsc = network['glif3'][int(tgt_key[0]), G.VSC]
         syn[:, S.WHT] *= vsc / 1000.0
 
-        # TEMPORARY TEST: 1.66× scaling to match NEST peak-at-tau PSC normalization
-        syn[:, S.WHT] *= 1.66
+        # NOTE: Removed 1.66× test scaling since PSC normalization was fixed in C code
+        # (Double-correction was likely causing issues)
 
         if p < 5:
-            print(f"LGN vsc={vsc}, weight after 1.66× test: {syn[0, S.WHT]}")
+            print(f"LGN vsc={vsc}, weight (no test scaling): {syn[0, S.WHT]}")
             p += 1
 
         receptor_type = f'synapse_{int(syn[0, S.RTY])}'
